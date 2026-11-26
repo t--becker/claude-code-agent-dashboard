@@ -5,7 +5,9 @@ import { createContext, useContext } from 'react';
 import {
 	Check,
 	ChevronDown,
+	ArrowLeft,
 	Ellipsis,
+	LayoutGrid,
 	GitBranch,
 	LoaderCircle,
 	Maximize2,
@@ -41,6 +43,8 @@ export const SettingsIcon = ({ size = 18 }: IconProps) => (
 	<SlidersHorizontal size={size} {...common} />
 );
 export const MoreIcon = ({ size = 20 }: IconProps) => <Ellipsis size={size} {...common} />;
+export const BackIcon = ({ size = 18 }: IconProps) => <ArrowLeft size={size} {...common} />;
+export const LibraryIcon = ({ size = 17 }: IconProps) => <LayoutGrid size={size} {...common} />;
 export const SearchIcon = ({ size = 18 }: IconProps) => <Search size={size} {...common} />;
 export const PencilIcon = ({ size = 14 }: IconProps) => <Pencil size={size} {...common} />;
 export const CloseIcon = ({ size = 16 }: IconProps) => <X size={size} {...common} />;

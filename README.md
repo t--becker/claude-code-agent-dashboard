@@ -25,6 +25,10 @@ _Sample chats, with the running agent in demo mode._
 
   ![Search results for the word seats](docs/search.png)
 
+- **Outputs on every chat.** What a chat made (pages, tickets, pull requests, published
+  artifacts, files, code changes) sits at the foot of its card, one click from opening.
+- **An artifact library.** Every page an agent published and every prototype, PDF, spreadsheet,
+  document and deck it made, on one page with a small live look at each and its own search.
 - **Start with just a folder.** Pick the project folder and type. The chat names itself from
   your first prompt and picks an icon for the kind of work.
 - **Attach anything.** Paste or drop screenshots, PDFs, CSVs and other files into a prompt.
@@ -94,6 +98,23 @@ they happen, answer permission questions from the banner, and run several of the
   reply banner, in search results and in the Closed sessions list. Topics are line icons from lucide. To use a logo of your own for a topic, put a picture named
   after the topic id in `~/.agent-workspace/logos`, for example `rcs.png` or `whatsapp.png`
   (`.png`, `.jpg` or `.webp`, up to 1 MB); the ids are listed in `shared/topics.ts`.
+- **Outputs.** When a chat has made something, a bar above its message box says how many things
+  and names them; click it for the list. It is worked out from the agent's tool calls: Confluence
+  pages and Jira tickets created or updated, pull requests and issues opened with `gh`, pages
+  published with the Artifact tool, Slack messages, Miro boards, files written, and any other
+  connected tool that says it creates something and answers with an address. Each opens in a new
+  tab. Edited source files are grouped as **Code changes**, which opens the edits themselves.
+  Only successful calls count, and a thing touched twice is listed once. Changes an agent makes
+  by running a script are not seen, only its own edit and write steps.
+- **Artifacts** (in the header) opens the library of what your agents made. It is read out of
+  Claude Code's saved chats on this machine: pages published with the Artifact tool, files an
+  agent wrote, and files a reply pointed you to (HTML, PDF, XLSX, CSV, DOCX, PPTX). A published
+  page opens on claude.ai; a file opens from your computer. Pages and PDFs show a live preview and
+  CSVs their first rows. A copy of each published page's source is kept in
+  `~/.agent-workspace/artifacts`, so its preview survives the temporary folder it was written
+  in; a page published before you installed the dashboard, whose source is already gone, shows a
+  placeholder. The library does not talk to claude.ai, so a page you delete there by hand stays
+  listed.
 - **Pin.** Pinning a card (from its menu) keeps it at the front of the grid; a pinned card shows
   a pin beside its title, which unpins it.
 - **Your picture.** Put a picture at `~/.agent-workspace/avatar.png` (or `.jpg`, `.webp`, `.gif`,

@@ -9,6 +9,8 @@ const dataDir = path.join(import.meta.dirname, 'test-results', 'e2e-data');
 // Outside this project on purpose: the sample folders must not sit inside a git repo, or their
 // cards would show this repo's branch instead of "no git".
 const repoRoot = path.join(os.tmpdir(), 'agent-workspace-e2e-repos');
+// A stand-in for Claude Code's own folder, holding one sample chat for the artifact library.
+const claudeDir = path.join(os.tmpdir(), 'agent-workspace-e2e-claude');
 
 export default defineConfig({
 	testDir: './e2e',
@@ -25,10 +27,11 @@ export default defineConfig({
 	},
 	webServer: {
 		command: [
-			`rm -rf ${dataDir} ${repoRoot}`,
+			`rm -rf ${dataDir} ${repoRoot} ${claudeDir}`,
 			`mkdir -p ${repoRoot}/alpha ${repoRoot}/beta`,
+			`node e2e/seed.mjs ${repoRoot} ${claudeDir}`,
 			'npm run build',
-			`PORT=${port} DATA_DIR=${dataDir} REPO_ROOT=${repoRoot} FORCE_DEMO=1 FOLDER_PICKER=off DEMO_TURN_MS=500 npm start`,
+			`PORT=${port} DATA_DIR=${dataDir} REPO_ROOT=${repoRoot} CLAUDE_CONFIG_DIR=${claudeDir} FORCE_DEMO=1 FOLDER_PICKER=off DEMO_TURN_MS=500 npm start`,
 		].join(' && '),
 		url: `http://127.0.0.1:${port}/api/health`,
 		reuseExistingServer: false,

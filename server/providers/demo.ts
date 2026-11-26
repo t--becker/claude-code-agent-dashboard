@@ -87,6 +87,43 @@ export class DemoProvider implements Provider {
 			});
 			await sleep(step);
 			if (cancelled) return;
+			// "outputs" in the prompt makes the simulated agent produce some: an edit, a ticket, a page.
+			if (/\boutputs?\b/i.test(ctx.prompt)) {
+				const made: [
+					name: string,
+					summary: string,
+					input: Record<string, unknown>,
+					result: string,
+					diff?: string,
+				][] = [
+					[
+						'Edit',
+						'src/app.ts',
+						{ file_path: 'src/app.ts' },
+						'The file was updated.',
+						"- const title = 'Old';\n+ const title = 'New';",
+					],
+					[
+						'mcp__tracker__createJiraIssue',
+						'Create a ticket',
+						{ cloudId: 'example.atlassian.net', summary: 'Fix the status refresh' },
+						'{"data":{"id":"1","key":"DEMO-7"}}',
+					],
+					[
+						'Artifact',
+						'Publish the summary page',
+						{ file_path: 'summary-page.html', title: 'Summary page' },
+						'Published summary-page.html at https://claude.ai/artifact/DemoSummary01 (Version 1)',
+					],
+				];
+				for (const [name, summary, input, result, diff] of made) {
+					const toolUseId = `demo-${randomUUID()}`;
+					ctx.emit({ type: 'tool', name, summary, toolUseId, input, diff });
+					ctx.emit({ type: 'tool_result', toolUseId, output: result });
+				}
+				await sleep(step);
+				if (cancelled) return;
+			}
 			if (/\bfail\b/i.test(ctx.prompt)) {
 				ctx.emit({ type: 'error', message: 'Demo failure requested by the prompt.' });
 				return;

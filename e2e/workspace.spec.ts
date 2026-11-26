@@ -501,3 +501,76 @@ test('search finds a chat by its title or by what was said in it, open or closed
 	await box.press('Escape');
 	await expect(results).toBeHidden();
 });
+
+test('the artifact library lists what agents published or made, previews it, and searches it', async ({
+	page,
+}) => {
+	await page.getByRole('button', { name: 'Artifacts' }).click();
+	await expect(page).toHaveURL(/#artifacts$/);
+	const library = page.getByRole('region', { name: 'Artifact library' });
+	await expect(library.getByRole('heading', { name: 'Artifact library' })).toBeVisible();
+
+	// The published page is there with a link to claude.ai; the one deleted afterwards is not.
+	const pageCard = library.getByRole('link', { name: /Checkout prototype/ });
+	await expect(pageCard).toHaveAttribute('href', 'https://claude.ai/artifact/SampleCheckout01');
+	await expect(pageCard).toContainText('Web app · on claude.ai');
+	await expect(pageCard.locator('iframe')).toHaveAttribute('src', /checkout\.html$/);
+	await expect(library.locator('.artifact')).toHaveCount(2);
+	await expect(library.getByText(/gone/i)).toHaveCount(0);
+
+	// The spreadsheet the agent pointed to shows its first rows and opens from this computer.
+	const sheet = library.getByRole('link', { name: /Rates/ });
+	await expect(sheet).toContainText('Spreadsheet · on this computer');
+	await expect(sheet.locator('table')).toContainText('AU');
+	await expect(sheet).toHaveAttribute('href', /\/api\/files\/.*rates\.csv$/);
+
+	await library.getByLabel('Search artifacts').fill('checkout');
+	await expect(library.locator('.artifact')).toHaveCount(1);
+	await library.getByLabel('Search artifacts').fill('');
+	await library.getByRole('button', { name: 'Spreadsheets 1' }).click();
+	await expect(library.locator('.artifact')).toHaveCount(1);
+
+	// The page survives a reload, and Back returns to the agents.
+	await page.reload();
+	await expect(library.getByRole('heading', { name: 'Artifact library' })).toBeVisible();
+	await page.getByRole('button', { name: 'Back to agents' }).click();
+	await expect(page.getByRole('combobox', { name: 'Search chats' })).toBeVisible();
+	await expect(library).toHaveCount(0);
+});
+
+test('what a chat made is kept at the foot of its card and opens from there', async ({ page }) => {
+	const card = await createAgent(page, 'Status refresh', 'Fix the refresh and share the outputs');
+	await expectState(card, 'Done');
+	const toggle = card.getByRole('button', { name: /Outputs · 3/ });
+	await expect(toggle).toContainText('Summary page · DEMO-7 Fix the status refresh · Code changes');
+
+	await toggle.click();
+	const list = card.getByRole('list', { name: 'Outputs of Status refresh' });
+	await expect(list.getByRole('link', { name: /Summary page/ })).toHaveAttribute(
+		'href',
+		'https://claude.ai/artifact/DemoSummary01'
+	);
+	const ticket = list.getByRole('link', { name: /DEMO-7 Fix the status refresh/ });
+	await expect(ticket).toContainText('Jira ticket · Created');
+	await expect(ticket).toHaveAttribute('href', 'https://example.atlassian.net/browse/DEMO-7');
+
+	// The bar and its list leave the chat itself alone: messages still stack and wrap.
+	const chat = card.locator('.output');
+	expect(await chat.evaluate((el) => getComputedStyle(el).display)).toBe('block');
+	expect(await chat.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
+
+	// Code changes opens the edits themselves.
+	await list.getByRole('button', { name: /Code changes/ }).click();
+	const changes = page.getByRole('dialog', { name: 'Code changes' });
+	await expect(changes).toContainText("+ const title = 'New';");
+	await page.keyboard.press('Escape');
+	await expect(changes).toBeHidden();
+
+	// The list is still there after a reload, and a chat that made nothing has no bar.
+	await page.reload();
+	await live(page);
+	await expect(card.getByRole('button', { name: /Outputs · 3/ })).toBeVisible();
+	await expect(
+		page.locator(CARD, { hasText: 'Onboarding links' }).getByRole('button', { name: /Outputs/ })
+	).toHaveCount(0);
+});

@@ -7,8 +7,16 @@ export type ProviderEvent =
 	/** A status label for the current step ("Thinking", "Running Bash"); never model output. */
 	| { type: 'activity'; label: string }
 	| { type: 'assistant'; text: string }
-	| { type: 'tool'; name: string; summary: string; toolUseId?: string; diff?: string }
-	| { type: 'tool_result'; toolUseId: string; output: string; isError?: boolean }
+	| {
+			type: 'tool';
+			name: string;
+			summary: string;
+			toolUseId?: string;
+			diff?: string;
+			/** What the tool was asked, for working out what the chat produces. Never saved. */
+			input?: Record<string, unknown>;
+	  }
+	| { type: 'tool_result'; toolUseId: string; output: string; isError?: boolean; full?: string }
 	| { type: 'done'; costUsd?: number }
 	| { type: 'error'; message: string }
 	| { type: 'stopped' };

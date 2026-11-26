@@ -103,6 +103,19 @@ describe('your own topic logos', () => {
 	});
 });
 
+describe('artifact library route', () => {
+	it('answers with the library, and with nothing when the server has none', async () => {
+		const deps = await makeDeps(os.tmpdir(), []);
+		expect(await (await createApp(deps).request('/api/artifacts')).json()).toEqual([]);
+		const item = { id: 'page:1', kind: 'page' as const, title: 'Map', updatedAt: 1 };
+		const withLibrary = createApp({
+			...deps,
+			artifacts: { list: async () => [item] } as unknown as AppDeps['artifacts'],
+		});
+		expect(await (await withLibrary.request('/api/artifacts')).json()).toEqual([item]);
+	});
+});
+
 describe('new agent and rename routes', () => {
 	const json = { 'content-type': 'application/json' };
 

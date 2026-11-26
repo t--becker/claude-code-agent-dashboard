@@ -16,6 +16,7 @@ import {
 } from '@shared/types';
 import { isTopic, suggestTopic } from '@shared/topics';
 import { AttachmentError, saveFiles, type SavedFile } from './attachments';
+import { OutputCollector } from './outputs';
 import type { EventBus } from './events';
 import {
 	ACTIVE_WINDOW_MS,
@@ -78,6 +79,8 @@ export const RESUME_PROMPT = 'Continue from where you stopped.';
 
 /** Upper bound on entries kept per card; older ones fall off the front. */
 const MAX_TRANSCRIPT = 2000;
+/** Bumped when a mirrored chat should be read again to pick up something new (2: outputs). */
+const MIRROR_REV = 2;
 
 const entry = (data: TranscriptEntryInput): TranscriptEntry =>
 	({ id: randomUUID(), ts: Date.now(), ...data }) as TranscriptEntry;
@@ -103,6 +106,8 @@ export class SessionManager {
 	private readonly ignoredExternal = new Set<string>();
 	/** Mirrored cards already rebuilt from their chat's full history this process. */
 	private readonly rebuilt = new Set<string>();
+	/** Per chat, what its tool calls have produced so far and which are still running. */
+	private readonly collectors = new Map<string, OutputCollector>();
 
 	private defaultMode: PermissionMode;
 
@@ -194,6 +199,7 @@ export class SessionManager {
 				auto: options.auto || undefined,
 				messageCount: messages.length,
 				timed: true,
+				rev: MIRROR_REV,
 			},
 			transcript: [
 				entry({
@@ -203,6 +209,7 @@ export class SessionManager {
 				...trimEntries(converted.entries),
 			],
 		};
+		if (converted.outputs.length) session.outputs = converted.outputs;
 		this.suggestIcon(session, converted.entries.find((item) => item.kind === 'user')?.text);
 		this.sessions.set(session.id, session);
 		this.ignoredExternal.delete(sessionId);
@@ -276,12 +283,16 @@ export class SessionManager {
 					this.rebuilt.add(session.id);
 					if (
 						!link.timed ||
+						link.rev !== MIRROR_REV ||
 						session.transcript.some((e) => e.kind === 'tool' && e.toolUseId === undefined)
 					) {
 						const all = await external.messages(link.sessionId).catch(() => undefined);
 						if (all) {
 							link.timed = true;
+							link.rev = MIRROR_REV;
 							const converted = convertMessages(all, info.createdAt ?? Date.now());
+							session.outputs = converted.outputs.length ? converted.outputs : undefined;
+							this.collectors.delete(session.id);
 							const note = session.transcript[0];
 							session.transcript = [
 								...(note?.kind === 'system' && note.text.startsWith('Mirroring') ? [note] : []),
@@ -298,7 +309,9 @@ export class SessionManager {
 				if (info.lastModified !== link.lastModified) {
 					const fresh = await external.messages(link.sessionId, link.messageCount).catch(() => []);
 					if (fresh.length) {
-						const converted = convertMessages(fresh, Date.now());
+						const converted = convertMessages(fresh, Date.now(), session.outputs);
+						if (converted.outputs.length) session.outputs = converted.outputs;
+						this.collectors.delete(session.id);
 						session.transcript.push(...converted.entries);
 						applyToolResults(session.transcript, converted.orphanResults);
 						session.transcript = trimEntries(session.transcript, MAX_TRANSCRIPT);
@@ -554,6 +567,7 @@ export class SessionManager {
 		if (folder) await fs.rm(folder, { recursive: true, force: true }).catch(() => undefined);
 		this.sessions.delete(id);
 		this.runs.delete(id);
+		this.collectors.delete(id);
 		this.persist();
 		this.deps.bus.publish({
 			type: 'session',
@@ -641,6 +655,15 @@ export class SessionManager {
 		if (session.state === 'Running' || session.state === 'Needs input') {
 			throw new HttpError(409, 'This agent is busy. Stop it or wait for it to finish first.');
 		}
+	}
+
+	private collectorFor(session: Session): OutputCollector {
+		let collector = this.collectors.get(session.id);
+		if (!collector) {
+			collector = new OutputCollector(session.outputs);
+			this.collectors.set(session.id, collector);
+		}
+		return collector;
 	}
 
 	private attachmentsDirFor(session: Session): string | undefined {
@@ -737,10 +760,15 @@ export class SessionManager {
 						...(event.diff ? { diff: event.diff } : {}),
 					})
 				);
+				this.collectorFor(session).begin(event.toolUseId, event.name, event.input);
 				break;
-			case 'tool_result':
+			case 'tool_result': {
 				applyToolResults(session.transcript, [event]);
+				const collector = this.collectorFor(session);
+				if (collector.finish(event.toolUseId, event.full ?? event.output, event.isError))
+					session.outputs = collector.list();
 				break;
+			}
 			case 'done':
 				this.runs.delete(id);
 				session.turns += 1;

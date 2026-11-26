@@ -49,6 +49,8 @@ export interface ExternalLink {
 	messageCount: number;
 	/** True once the transcript carries each message's own time, read from the saved chat. */
 	timed?: boolean;
+	/** Which reading of the saved chat this card holds; an older one is read again once. */
+	rev?: number;
 }
 
 export interface ProviderInfo {
@@ -145,7 +147,61 @@ export interface Session {
 	/** Set while the card mirrors a chat that lives outside the workspace. */
 	external?: ExternalLink;
 	pendingInput?: PendingInput;
+	/** What this chat has created or changed so far, oldest first. */
+	outputs?: ChatOutput[];
 	transcript: TranscriptEntry[];
+}
+
+/** What a chat produced, by the kind of thing it is; decides the icon on the Outputs bar. */
+export type OutputKind =
+	| 'artifact'
+	| 'page'
+	| 'ticket'
+	| 'doc'
+	| 'design'
+	| 'dashboard'
+	| 'message'
+	| 'pr'
+	| 'file'
+	| 'code'
+	| 'link';
+
+/** One thing a chat created or changed outside itself: a page, a ticket, a file, code. */
+export interface ChatOutput {
+	/** Identity, so the same thing touched twice is listed once. */
+	key: string;
+	kind: OutputKind;
+	title: string;
+	/** What it is, in words: "Confluence page", "Jira ticket", "Web app". */
+	label: string;
+	/** What the chat did to it: Created, Updated, Published, Sent, Opened. */
+	verb: string;
+	/** Where it lives on the web, when that is known. */
+	url?: string;
+	/** The file on this machine, for a file output. */
+	file?: string;
+	/** For code changes: the files that were edited. */
+	files?: string[];
+	ts: number;
+}
+
+/** What kind of thing an artifact is, which decides its label, icon and preview. */
+export type ArtifactKind = 'page' | 'pdf' | 'sheet' | 'doc' | 'slides';
+
+/** Something an agent made that is worth finding again: a published page or a file on disk. */
+export interface ArtifactItem {
+	id: string;
+	kind: ArtifactKind;
+	title: string;
+	/** Where it is published on claude.ai, for a page that was. */
+	url?: string;
+	/** The file on this machine, when it still exists: the page's source, or the file itself. */
+	file?: string;
+	/** When it was last published or changed. */
+	updatedAt: number;
+	/** The Claude Code chat it came from. */
+	chatId?: string;
+	chatTitle?: string;
 }
 
 export interface WorkspaceConfig {

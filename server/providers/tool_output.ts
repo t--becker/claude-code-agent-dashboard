@@ -20,7 +20,12 @@ export interface ToolResult {
 	toolUseId: string;
 	output: string;
 	isError?: boolean;
+	/** The result before clipping, for working out what the tool made. Never saved. */
+	full?: string;
 }
+
+/** Enough of a result to find the address of what a tool made, without holding megabytes. */
+const MAX_FULL = 200_000;
 
 /** Pulls tool results out of a user message's content blocks, as the API delivers them. */
 export function extractToolResults(content: unknown): ToolResult[] {
@@ -43,6 +48,7 @@ export function extractToolResults(content: unknown): ToolResult[] {
 			toolUseId: result.tool_use_id,
 			output: clipOutput(text),
 			isError: result.is_error || undefined,
+			full: text.length > MAX_TOOL_OUTPUT ? text.slice(0, MAX_FULL) : undefined,
 		});
 	}
 	return results;

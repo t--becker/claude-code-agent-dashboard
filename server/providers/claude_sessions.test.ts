@@ -71,6 +71,7 @@ describe('convertMessages', () => {
 			lastModel: undefined,
 			prompts: 0,
 			orphanResults: [],
+			outputs: [],
 		});
 		expect(convertMessages([user('u', '<system-reminder>x</system-reminder>')], 0).entries).toEqual(
 			[]

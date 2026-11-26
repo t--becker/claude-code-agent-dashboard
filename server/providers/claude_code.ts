@@ -312,6 +312,7 @@ export class ClaudeCodeProvider implements Provider {
 									(block.input ?? {}) as Record<string, unknown>
 								),
 								toolUseId: block.id,
+								input: (block.input ?? {}) as Record<string, unknown>,
 								diff: describeToolChange(
 									block.name,
 									(block.input ?? {}) as Record<string, unknown>

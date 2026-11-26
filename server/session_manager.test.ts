@@ -339,6 +339,69 @@ describe('SessionManager', () => {
 		});
 	});
 
+	describe('outputs', () => {
+		it('collects what an agent made during a run and keeps it with the chat', async () => {
+			const { manager } = await makeManager();
+			const card = await manager.create({ path: tmp, title: 'Status refresh' });
+			expect(card.outputs).toBeUndefined();
+			await manager.prompt(card.id, 'Fix it and share the outputs');
+			await waitForState(() => manager.get(card.id), 'Done');
+			expect(manager.get(card.id).outputs?.map((o) => [o.kind, o.label, o.verb, o.title])).toEqual([
+				['code', '1 file', 'View diff', 'Code changes'],
+				['ticket', 'Jira ticket', 'Created', 'DEMO-7 Fix the status refresh'],
+				['artifact', 'Artifact', 'Published', 'Summary page'],
+			]);
+			expect(manager.get(card.id).outputs?.[1]?.url).toBe(
+				'https://example.atlassian.net/browse/DEMO-7'
+			);
+			// A second run adds to the same list, without repeating anything.
+			await manager.prompt(card.id, 'Share the outputs again');
+			await waitForState(() => manager.get(card.id), 'Done');
+			expect(manager.get(card.id).outputs).toHaveLength(3);
+		});
+
+		it('reads them out of a mirrored chat too', async () => {
+			const external = new FakeExternalSource();
+			external.add({ sessionId: 'o1', title: 'Docs work', cwd: tmp, lastModified: Date.now() }, [
+				{
+					type: 'assistant',
+					uuid: 'a1',
+					parent_tool_use_id: null,
+					message: {
+						role: 'assistant',
+						content: [
+							{
+								type: 'tool_use',
+								id: 't1',
+								name: 'Bash',
+								input: { command: 'gh pr create --title "Docs"' },
+							},
+						],
+					},
+				},
+				{
+					type: 'user',
+					uuid: 'u1',
+					parent_tool_use_id: null,
+					message: {
+						role: 'user',
+						content: [
+							{
+								type: 'tool_result',
+								tool_use_id: 't1',
+								content: 'https://github.com/acme/docs/pull/3',
+							},
+						],
+					},
+				},
+			]);
+			const { manager } = await makeManager({ external });
+			expect((await manager.importExternal('o1')).outputs).toMatchObject([
+				{ kind: 'pr', title: 'Docs', verb: 'Opened', url: 'https://github.com/acme/docs/pull/3' },
+			]);
+		});
+	});
+
 	describe('topic icon', () => {
 		it('is suggested from the first prompt, not the folder, and follows a rename until you choose', async () => {
 			const { manager } = await makeManager();

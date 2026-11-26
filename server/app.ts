@@ -13,6 +13,7 @@ import {
 	type WorkspaceConfig,
 } from '@shared/types';
 import { isTopic } from '@shared/topics';
+import type { ArtifactIndex } from './artifacts';
 import type { ServerConfig } from './config';
 import { pickFolder, type PickedFolder } from './folder_picker';
 import { makeOriginPolicy } from './security';
@@ -24,6 +25,8 @@ export interface AppDeps {
 	providerInfos: () => ProviderInfo[];
 	/** Replaces the real folder chooser in tests. */
 	pickFolder?: (startDir: string) => Promise<PickedFolder>;
+	/** The library of what agents made, read from saved chats. Absent in a hermetic demo. */
+	artifacts?: ArtifactIndex;
 }
 
 const MIME: Record<string, string> = {
@@ -47,10 +50,17 @@ const FILE_MIME: Record<string, string> = {
 	'.gif': 'image/gif',
 	'.webp': 'image/webp',
 	'.pdf': 'application/pdf',
+	'.csv': 'text/csv; charset=utf-8',
+	'.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+	'.xls': 'application/vnd.ms-excel',
+	'.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+	'.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
 	'.mp4': 'video/mp4',
 };
 
 export const attachmentsDir = (config: ServerConfig) => path.join(config.dataDir, 'attachments');
+/** Copies of published pages' sources, kept so their previews outlive temporary folders. */
+export const keptPagesDir = (config: ServerConfig) => path.join(config.dataDir, 'artifacts');
 
 /** Folders the browser may open files from: the repos, every session's folder, and where agents write temp files. */
 export async function allowedRoots(deps: AppDeps): Promise<string[]> {
@@ -58,6 +68,7 @@ export async function allowedRoots(deps: AppDeps): Promise<string[]> {
 		deps.config.repoRoot,
 		// Pictures sent with prompts, so the transcript can show them.
 		attachmentsDir(deps.config),
+		keptPagesDir(deps.config),
 		os.tmpdir(),
 		'/tmp',
 		...deps.manager.list().map((s) => s.path),
@@ -209,6 +220,8 @@ export function createApp(deps: AppDeps): Hono {
 	};
 
 	app.get('/api/bootstrap', async (c) => c.json(await bootstrap()));
+
+	app.get('/api/artifacts', async (c) => c.json((await deps.artifacts?.list()) ?? []));
 
 	app.get('/api/logos/:topic', async (c) => {
 		const logo = (await findLogos(deps.config)).get(c.req.param('topic'));

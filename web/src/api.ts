@@ -1,4 +1,5 @@
 import type {
+	ArtifactItem,
 	AnswerInput,
 	BootstrapResponse,
 	CreateSessionInput,
@@ -33,6 +34,7 @@ const post = <T>(url: string, body?: unknown) =>
 
 export const api = {
 	bootstrap: () => request<BootstrapResponse>('/api/bootstrap'),
+	artifacts: () => request<ArtifactItem[]>('/api/artifacts'),
 	create: (input: CreateSessionInput) => post<Session>('/api/sessions', input),
 	prompt: (id: string, text: string, files: PromptFile[] = []) =>
 		post<Session>(`/api/sessions/${id}/prompt`, files.length ? { text, files } : { text }),

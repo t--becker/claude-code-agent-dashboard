@@ -31,6 +31,7 @@ import {
 	ShrinkIcon,
 	StatusMark,
 } from './icons';
+import { OutputsBar } from './OutputsBar';
 import { PendingInputBox } from './PendingInputBox';
 import { TopicIcon } from './TopicIcon';
 import { Transcript } from './Transcript';
@@ -561,6 +562,12 @@ export function AgentCard({
 			</div>
 
 			{showSettings && !focused && settings}
+
+			<OutputsBar
+				outputs={session.outputs ?? []}
+				transcript={session.transcript}
+				title={session.title}
+			/>
 
 			<form className="composer" onSubmit={submit}>
 				{files.length > 0 && (

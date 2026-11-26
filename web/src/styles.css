@@ -258,6 +258,212 @@ body {
 	border: 1px solid var(--line-strong);
 }
 
+/* Artifact library: everything the agents made, as cards with a small live look at each */
+#agent-home .top .secondary {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	height: 40px;
+	padding: 0 14px;
+	border-radius: 9px;
+	font-size: 15px;
+	font-weight: 600;
+	white-space: nowrap;
+}
+#agent-home .top .back {
+	margin-left: auto;
+}
+#agent-home .library {
+	max-width: 1560px;
+	margin: 0 auto;
+	padding: 34px 28px 20px;
+}
+#agent-home .library-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px 40px;
+	flex-wrap: wrap;
+	margin-bottom: 26px;
+}
+#agent-home .library h1 {
+	margin: 0;
+	font-size: 44px;
+	font-weight: 750;
+	letter-spacing: -1.2px;
+	line-height: 1.1;
+}
+#agent-home .library-search {
+	margin: 0;
+	flex: 1 1 380px;
+	max-width: 620px;
+	height: 52px;
+	padding: 0 16px;
+	border-radius: 11px;
+}
+#agent-home .library-search input {
+	font-size: 17px;
+}
+#agent-home .library .chips {
+	margin-bottom: 22px;
+}
+#agent-home .library-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(min(100%, 400px), 1fr));
+	gap: 22px;
+}
+#agent-home .artifact {
+	--kind: #0f9f8f;
+	--kind-soft: #e2f5f1;
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	background: var(--panel);
+	border: 1px solid var(--line-strong);
+	border-radius: 14px;
+	overflow: hidden;
+	color: inherit;
+	text-decoration: none;
+	box-shadow: 0 1px 2px rgba(27, 31, 42, 0.04);
+	transition:
+		box-shadow 0.15s,
+		transform 0.15s;
+}
+#agent-home .artifact:hover {
+	box-shadow: 0 10px 26px rgba(27, 31, 42, 0.12);
+	transform: translateY(-2px);
+}
+#agent-home .artifact.kind-pdf {
+	--kind: #e5342b;
+	--kind-soft: #fdeceb;
+}
+#agent-home .artifact.kind-sheet {
+	--kind: #1f9d55;
+	--kind-soft: #e4f6ea;
+}
+#agent-home .artifact.kind-doc {
+	--kind: #2563eb;
+	--kind-soft: #e7effe;
+}
+#agent-home .artifact.kind-slides {
+	--kind: #e0820d;
+	--kind-soft: #fef1dc;
+}
+#agent-home .artifact-preview {
+	margin: 16px 16px 0;
+	border: 1px solid var(--line);
+	border-radius: 10px;
+	overflow: hidden;
+	background: var(--panel);
+}
+#agent-home .artifact-band {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 12px 16px;
+	background: var(--kind-soft);
+	color: var(--kind);
+	font-size: 17px;
+	font-weight: 700;
+	letter-spacing: -0.2px;
+}
+#agent-home .artifact-band span {
+	color: var(--text);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+#agent-home .artifact-frame {
+	position: relative;
+	height: 250px;
+	overflow: hidden;
+	background: #fff;
+}
+/* The page is laid out wider than the box and scaled down, so it looks as it does full size. */
+#agent-home .artifact-live {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 250%;
+	height: 250%;
+	border: 0;
+	transform: scale(0.4);
+	transform-origin: 0 0;
+	pointer-events: none;
+	background: #fff;
+}
+#agent-home .artifact-live.pdf {
+	width: 200%;
+	height: 200%;
+	transform: scale(0.5);
+}
+#agent-home .artifact-blank {
+	height: 100%;
+	display: grid;
+	place-content: center;
+	justify-items: center;
+	gap: 10px;
+	color: var(--kind);
+	background: color-mix(in srgb, var(--kind-soft) 45%, white);
+	font-size: 13.5px;
+}
+#agent-home .artifact-blank span {
+	color: var(--sub);
+}
+#agent-home .artifact-table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 13px;
+}
+#agent-home .artifact-table th,
+#agent-home .artifact-table td {
+	padding: 9px 12px;
+	border-bottom: 1px solid var(--line);
+	border-right: 1px solid var(--line);
+	text-align: left;
+	max-width: 140px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+#agent-home .artifact-table th {
+	background: var(--kind-soft);
+	font-weight: 650;
+}
+#agent-home .artifact-foot {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 14px;
+	padding: 18px 22px 20px;
+}
+#agent-home .artifact-foot > div {
+	min-width: 0;
+	display: grid;
+	gap: 2px;
+}
+#agent-home .artifact-foot strong {
+	font-size: 19px;
+	font-weight: 700;
+	letter-spacing: -0.3px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+#agent-home .artifact-foot span {
+	color: var(--sub);
+	font-size: 15px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+#agent-home .library .more {
+	display: block;
+	margin: 24px auto 0;
+	padding: 9px 18px;
+	font-size: 15px;
+}
+
 /* Filter chips and workspace-wide controls */
 #agent-home .intro {
 	display: flex;
@@ -1265,6 +1471,179 @@ body {
 	display: flex;
 	gap: 8px;
 	margin-top: 10px;
+}
+
+/* Outputs: what the chat made, on one line above the message box, opening into a list */
+#agent-home .outputs {
+	position: relative;
+	margin: 6px 16px 0;
+}
+#agent-home .outputs-toggle {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	width: 100%;
+	min-width: 0;
+	padding: 6px 12px;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: var(--soft);
+	text-align: left;
+	font-size: 14.5px;
+}
+#agent-home .outputs-toggle:hover,
+#agent-home .outputs-toggle[aria-expanded='true'] {
+	border-color: var(--line-strong);
+	background: #eceef4;
+}
+#agent-home .outputs-caret {
+	font-size: 10px;
+	color: #475467;
+}
+#agent-home .outputs-toggle strong {
+	flex: none;
+	font-weight: 650;
+}
+#agent-home .outputs-names {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	color: var(--sub);
+	font-size: 13.5px;
+}
+#agent-home .outputs-list {
+	position: absolute;
+	z-index: 15;
+	left: 8px;
+	right: 8px;
+	bottom: calc(100% + 8px);
+	max-height: 320px;
+	overflow: auto;
+	padding: 6px 12px;
+	background: var(--panel);
+	border: 1px solid var(--line-strong);
+	border-radius: 10px;
+	box-shadow: 0 10px 30px rgba(27, 31, 42, 0.18);
+}
+#agent-home .outputs-list > div + div {
+	border-top: 1px solid var(--line);
+}
+#agent-home .output-row {
+	display: flex;
+	align-items: center;
+	gap: 14px;
+	width: 100%;
+	padding: 9px 4px;
+	border: 0;
+	background: transparent;
+	color: inherit;
+	text-align: left;
+	text-decoration: none;
+	border-radius: 6px;
+}
+#agent-home a.output-row:hover,
+#agent-home button.output-row:hover {
+	background: var(--soft);
+}
+#agent-home .output-icon {
+	flex: none;
+	width: 30px;
+	height: 30px;
+	display: grid;
+	place-items: center;
+	color: var(--blue);
+}
+#agent-home .output-icon.kind-artifact,
+#agent-home .output-icon.kind-design {
+	color: #0f9f8f;
+}
+#agent-home .output-icon.kind-code,
+#agent-home .output-icon.kind-pr {
+	color: var(--violet);
+}
+#agent-home .output-icon.kind-file,
+#agent-home .output-icon.kind-dashboard {
+	color: #d0700d;
+}
+#agent-home .output-icon.kind-message,
+#agent-home .output-icon.kind-link {
+	color: #475467;
+}
+#agent-home .output-text {
+	flex: 1;
+	min-width: 0;
+	display: grid;
+}
+#agent-home .output-text strong {
+	font-weight: 650;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+#agent-home .output-text span {
+	color: var(--sub);
+	font-size: 13.5px;
+}
+#agent-home .output-row > svg {
+	color: #475467;
+}
+/* The edits behind "Code changes", in a panel over the page */
+#agent-home .overlay {
+	position: fixed;
+	inset: 0;
+	z-index: 60;
+	display: grid;
+	place-items: center;
+	padding: 24px;
+	background: rgba(27, 31, 42, 0.38);
+}
+#agent-home .changes {
+	width: min(860px, 100%);
+	max-height: min(82vh, 900px);
+	display: flex;
+	flex-direction: column;
+	background: var(--panel);
+	border-radius: 14px;
+	box-shadow: 0 24px 60px rgba(27, 31, 42, 0.3);
+	overflow: hidden;
+}
+#agent-home .changes-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 14px 14px 14px 20px;
+	border-bottom: 1px solid var(--line);
+	font-size: 17px;
+}
+#agent-home .changes-body {
+	overflow: auto;
+	padding: 6px 20px 20px;
+}
+#agent-home .changes h4 {
+	margin: 16px 0 8px;
+	font: 600 13.5px var(--mono);
+}
+#agent-home .changes .diff {
+	margin: 0 0 10px;
+	padding: 8px 0;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: var(--soft);
+	font: 12.5px/1.55 var(--mono);
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}
+#agent-home .changes .diff span {
+	display: block;
+	padding: 0 12px;
+}
+#agent-home .changes .diff .added {
+	background: #d9f5e1;
+}
+#agent-home .changes .diff .removed {
+	background: #fde0e0;
 }
 
 /* Message box: the text on top, its tools underneath */

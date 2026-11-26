@@ -4,7 +4,16 @@ import path from 'node:path';
 import { serve } from '@hono/node-server';
 import { WebSocketServer, WebSocket } from 'ws';
 import type { ServerEvent } from '@shared/types';
-import { attachmentsDir, createApp, workspaceConfig } from './app';
+import {
+	allowedRoots,
+	attachmentsDir,
+	createApp,
+	keptPagesDir,
+	resolveLocalFile,
+	workspaceConfig,
+	type AppDeps,
+} from './app';
+import { ArtifactIndex } from './artifacts';
 import { loadConfig } from './config';
 import { EventBus } from './events';
 import { getBranch } from './git';
@@ -37,14 +46,15 @@ async function main() {
 	const store = new SessionStore(path.join(config.dataDir, 'sessions.json'));
 	const settings = new SettingsStore(path.join(config.dataDir, 'settings.json'));
 	const bus = new EventBus();
+	// Demo mode stays hermetic: it never reads the real ~/.claude chats.
+	const external = config.forceDemo ? new NoExternalSource() : new SdkExternalSource();
 	const manager = new SessionManager({
 		store,
 		bus,
 		providers: registry.providers,
 		providerInfos: () => registry.infos,
 		getBranch,
-		// Demo mode stays hermetic: it never reads the real ~/.claude chats.
-		external: config.forceDemo ? new NoExternalSource() : new SdkExternalSource(),
+		external,
 		autoMirror: config.autoMirror,
 		attachmentsDir: attachmentsDir(config),
 		defaultPermissionMode: settings.load().defaultPermissionMode,
@@ -54,7 +64,17 @@ async function main() {
 	manager.init();
 	manager.startMirroring();
 
-	const deps = { config, manager, providerInfos: () => registry.infos };
+	const deps: AppDeps = { config, manager, providerInfos: () => registry.infos };
+	// The artifact library reads saved chats too, so demo mode only gets one when it is pointed
+	// at a folder of its own.
+	if (!config.forceDemo || process.env.CLAUDE_CONFIG_DIR)
+		deps.artifacts = new ArtifactIndex({
+			keepDir: keptPagesDir(config),
+			canServe: async (file) =>
+				(await resolveLocalFile(file, await allowedRoots(deps))) !== undefined,
+			chatTitles: async () =>
+				new Map((await external.list(2000)).map((chat) => [chat.sessionId, chat.title])),
+		});
 	const app = createApp(deps);
 	const server = serve({ fetch: app.fetch, port: config.port, hostname: config.host }, (info) => {
 		log(

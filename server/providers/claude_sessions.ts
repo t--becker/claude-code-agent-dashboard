@@ -2,7 +2,8 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { getSessionInfo, getSessionMessages, listSessions } from '@anthropic-ai/claude-agent-sdk';
-import type { OpenInfo, TranscriptEntry } from '@shared/types';
+import type { ChatOutput, OpenInfo, TranscriptEntry } from '@shared/types';
+import { OutputCollector } from '../outputs';
 import { describeToolInput } from './claude_code';
 import { describeToolChange, extractToolResults, type ToolResult } from './tool_output';
 
@@ -262,6 +263,8 @@ interface AnthropicMessage {
 
 export interface ConvertedTranscript {
 	entries: TranscriptEntry[];
+	/** What the chat created or changed, worked out from its tool calls. */
+	outputs: ChatOutput[];
 	/** Model named by the most recent assistant message. */
 	lastModel?: string;
 	/** Number of user prompts, so the card's turn count matches. */
@@ -279,8 +282,11 @@ const stripReminders = (text: string) =>
 /** Maps raw Claude Code messages onto transcript entries: prompts, replies and tool calls, nothing else. */
 export function convertMessages(
 	messages: ExternalMessage[],
-	baseTs = Date.now()
+	baseTs = Date.now(),
+	/** What the chat had already produced, when this is only its newest messages. */
+	produced: ChatOutput[] = []
 ): ConvertedTranscript {
+	const outputs = new OutputCollector(produced);
 	const entries: TranscriptEntry[] = [];
 	const results: ToolResult[] = [];
 	let lastModel: string | undefined;
@@ -294,7 +300,10 @@ export function convertMessages(
 		lastTs = ts;
 		const id = `${raw.uuid}-${index}`;
 		if (raw.type === 'user') {
-			results.push(...extractToolResults(message.content));
+			const arrived = extractToolResults(message.content);
+			results.push(...arrived);
+			for (const result of arrived)
+				outputs.finish(result.toolUseId, result.full ?? result.output, result.isError, ts);
 			let text = '';
 			if (typeof message.content === 'string') text = message.content;
 			else if (Array.isArray(message.content)) {
@@ -328,12 +337,13 @@ export function convertMessages(
 						toolUseId: block.id,
 						diff: describeToolChange(block.name, (block.input ?? {}) as Record<string, unknown>),
 					});
+					outputs.begin(block.id, block.name, (block.input ?? {}) as Record<string, unknown>, ts);
 				}
 			});
 		}
 	});
 	const orphanResults = applyToolResults(entries, results);
-	return { entries, lastModel, prompts, orphanResults };
+	return { entries, lastModel, prompts, orphanResults, outputs: outputs.list() };
 }
 
 /** Attaches tool results to the matching tool entries, newest first; returns the ones with no match. */

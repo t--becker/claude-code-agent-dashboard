@@ -1,9 +1,18 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { PERMISSION_MODES, type PermissionMode, type Session } from '@shared/types';
+import { api } from './api';
 import { AgentCard } from './components/AgentCard';
+import { ArtifactLibrary } from './components/ArtifactLibrary';
 import { ClosedSessions } from './components/ClosedSessions';
 import { FolderPrompt } from './components/FolderPrompt';
-import { ChevronIcon, LogoMark, PlusIcon, YourPicture } from './components/icons';
+import {
+	BackIcon,
+	ChevronIcon,
+	LibraryIcon,
+	LogoMark,
+	PlusIcon,
+	YourPicture,
+} from './components/icons';
 import { TopicLogos } from './components/TopicIcon';
 import { Notice } from './components/Notice';
 import { ReplyBanner } from './components/ReplyBanner';
@@ -21,6 +30,21 @@ export function App() {
 	const { state, actions } = useWorkspace();
 	const now = useNow();
 	const [ui, setUi] = useState<UiState>(() => loadUiState());
+	// Two pages share the header: the agents, and the library of what they made. The address
+	// keeps which one you are on, so a reload or the Back button behaves.
+	const [view, setView] = useState<'agents' | 'artifacts'>(() =>
+		window.location.hash === '#artifacts' ? 'artifacts' : 'agents'
+	);
+	useEffect(() => {
+		const follow = () => setView(window.location.hash === '#artifacts' ? 'artifacts' : 'agents');
+		window.addEventListener('hashchange', follow);
+		return () => window.removeEventListener('hashchange', follow);
+	}, []);
+	const go = (next: 'agents' | 'artifacts') => {
+		window.location.hash = next === 'artifacts' ? 'artifacts' : '';
+		setView(next);
+	};
+
 	const [notice, setNotice] = useState<{
 		sessionId?: string;
 		message: string;
@@ -234,149 +258,177 @@ export function App() {
 							<i aria-hidden="true" />
 							{state.connected ? 'Live' : 'Reconnecting…'}
 						</span>
-						<SearchBox sessions={sessions} tones={tones} onOpen={(s) => void openFromSearch(s)} />
-						<button
-							type="button"
-							className="new-agent"
-							onClick={() => void newAgent()}
-							disabled={!state.loaded || picking}
-						>
-							{!picking && <PlusIcon />}
-							{picking ? 'Choose a folder…' : 'New agent'}
-						</button>
+						{view === 'artifacts' ? (
+							<button type="button" className="secondary back" onClick={() => go('agents')}>
+								<BackIcon />
+								Back to agents
+							</button>
+						) : (
+							<>
+								<SearchBox
+									sessions={sessions}
+									tones={tones}
+									onOpen={(s) => void openFromSearch(s)}
+								/>
+								<button
+									type="button"
+									className="secondary library-link"
+									onClick={() => go('artifacts')}
+								>
+									<LibraryIcon />
+									Artifacts
+								</button>
+								<button
+									type="button"
+									className="new-agent"
+									onClick={() => void newAgent()}
+									disabled={!state.loaded || picking}
+								>
+									{!picking && <PlusIcon />}
+									{picking ? 'Choose a folder…' : 'New agent'}
+								</button>
+							</>
+						)}
 					</header>
 
-					<div className="intro">
-						<h2>Your agents</h2>
-						<div className="chips" role="group" aria-label="Show">
-							{chips
-								.filter((chip) => chip.id !== 'reply' || counts.reply > 0 || filter === 'reply')
-								.map((chip) => (
-									<button
-										key={chip.id}
-										type="button"
-										className={`chip${filter === chip.id ? ' on' : ''}`}
-										aria-pressed={filter === chip.id}
-										onClick={() => {
-											setFilter(chip.id);
-											patchUi({ focusedId: null });
-										}}
-									>
-										{chip.label} <span className={`count count-${chip.id}`}>{counts[chip.id]}</span>
-									</button>
-								))}
-						</div>
-						<div className="tools">
-							{state.loaded && mode && (
-								<label className="all-permissions">
-									Permissions
-									<select
-										aria-label="Permissions for all agents"
-										title="Sets every card, and the cards that appear later. Applies from each agent’s next prompt."
-										value={mode}
-										onChange={(event) =>
-											void setAllPermissions(event.target.value as PermissionMode)
-										}
-									>
-										{PERMISSION_MODES.map((m) => (
-											<option key={m.id} value={m.id}>
-												{m.label}
-											</option>
+					{view === 'artifacts' ? (
+						<ArtifactLibrary load={api.artifacts} />
+					) : (
+						<>
+							<div className="intro">
+								<h2>Your agents</h2>
+								<div className="chips" role="group" aria-label="Show">
+									{chips
+										.filter((chip) => chip.id !== 'reply' || counts.reply > 0 || filter === 'reply')
+										.map((chip) => (
+											<button
+												key={chip.id}
+												type="button"
+												className={`chip${filter === chip.id ? ' on' : ''}`}
+												aria-pressed={filter === chip.id}
+												onClick={() => {
+													setFilter(chip.id);
+													patchUi({ focusedId: null });
+												}}
+											>
+												{chip.label}{' '}
+												<span className={`count count-${chip.id}`}>{counts[chip.id]}</span>
+											</button>
 										))}
-									</select>
-								</label>
+								</div>
+								<div className="tools">
+									{state.loaded && mode && (
+										<label className="all-permissions">
+											Permissions
+											<select
+												aria-label="Permissions for all agents"
+												title="Sets every card, and the cards that appear later. Applies from each agent’s next prompt."
+												value={mode}
+												onChange={(event) =>
+													void setAllPermissions(event.target.value as PermissionMode)
+												}
+											>
+												{PERMISSION_MODES.map((m) => (
+													<option key={m.id} value={m.id}>
+														{m.label}
+													</option>
+												))}
+											</select>
+										</label>
+									)}
+									<button
+										type="button"
+										className={`return${focusedId ? ' visible' : ''}`}
+										onClick={() => patchUi({ focusedId: null })}
+									>
+										← All agents
+									</button>
+								</div>
+							</div>
+
+							{mode === 'bypassPermissions' && (
+								<div className="permission-warning" role="note">
+									Agents run every command, edit and connected tool without asking you first.
+									Applies from each agent’s next prompt, and to new and mirrored cards.
+								</div>
 							)}
-							<button
-								type="button"
-								className={`return${focusedId ? ' visible' : ''}`}
-								onClick={() => patchUi({ focusedId: null })}
-							>
-								← All agents
-							</button>
-						</div>
-					</div>
 
-					{mode === 'bypassPermissions' && (
-						<div className="permission-warning" role="note">
-							Agents run every command, edit and connected tool without asking you first. Applies
-							from each agent’s next prompt, and to new and mirrored cards.
-						</div>
-					)}
+							{state.loadError && !state.loaded && (
+								<div className="notice" role="alert">
+									<span>
+										Could not reach the workspace server: {state.loadError}. Start it with `npm run
+										dev`.
+									</span>
+								</div>
+							)}
 
-					{state.loadError && !state.loaded && (
-						<div className="notice" role="alert">
-							<span>
-								Could not reach the workspace server: {state.loadError}. Start it with `npm run
-								dev`.
-							</span>
-						</div>
-					)}
+							{ui.createOpen && state.loaded && (
+								<FolderPrompt
+									config={state.config}
+									reason={pickerProblem}
+									onStart={startIn}
+									onCancel={() => patchUi({ createOpen: false })}
+								/>
+							)}
 
-					{ui.createOpen && state.loaded && (
-						<FolderPrompt
-							config={state.config}
-							reason={pickerProblem}
-							onStart={startIn}
-							onCancel={() => patchUi({ createOpen: false })}
-						/>
-					)}
+							{notice && (
+								<Notice
+									message={notice.message}
+									onUndo={notice.undo}
+									onDismiss={() => setNotice(null)}
+								/>
+							)}
 
-					{notice && (
-						<Notice
-							message={notice.message}
-							onUndo={notice.undo}
-							onDismiss={() => setNotice(null)}
-						/>
-					)}
+							{banners.map((session) => (
+								<ReplyBanner
+									key={session.id}
+									session={session}
+									input={session.pendingInput!}
+									tone={tones.get(session.id)}
+									pinned={ui.pinned.includes(session.id)}
+									actions={actions}
+									onTogglePin={() => togglePin(session.id)}
+									onViewChat={() => patchUi({ focusedId: session.id })}
+									onClose={() => void closeSession(session)}
+								/>
+							))}
 
-					{banners.map((session) => (
-						<ReplyBanner
-							key={session.id}
-							session={session}
-							input={session.pendingInput!}
-							tone={tones.get(session.id)}
-							pinned={ui.pinned.includes(session.id)}
-							actions={actions}
-							onTogglePin={() => togglePin(session.id)}
-							onViewChat={() => patchUi({ focusedId: session.id })}
-							onClose={() => void closeSession(session)}
-						/>
-					))}
+							<div className={`grid${focusedId ? ' focused' : ''}`}>{cards.map(card)}</div>
 
-					<div className={`grid${focusedId ? ' focused' : ''}`}>{cards.map(card)}</div>
+							{state.loaded && open.length === 0 && (
+								<div className="empty">
+									No open agents. Press New agent and choose a project folder.
+								</div>
+							)}
+							{state.loaded &&
+								open.length > 0 &&
+								!focusedId &&
+								banners.length === 0 &&
+								!cards.some(shown) && <div className="empty">No agents match this filter.</div>}
+							{!state.loaded && !state.loadError && (
+								<div className="empty">Connecting to the workspace server…</div>
+							)}
 
-					{state.loaded && open.length === 0 && (
-						<div className="empty">
-							No open agents. Press New agent and choose a project folder.
-						</div>
-					)}
-					{state.loaded &&
-						open.length > 0 &&
-						!focusedId &&
-						banners.length === 0 &&
-						!cards.some(shown) && <div className="empty">No agents match this filter.</div>}
-					{!state.loaded && !state.loadError && (
-						<div className="empty">Connecting to the workspace server…</div>
-					)}
-
-					{state.loaded && !focusedId && (
-						<button
-							type="button"
-							className="section-toggle"
-							aria-expanded={ui.archiveOpen}
-							onClick={() => patchUi({ archiveOpen: !ui.archiveOpen })}
-						>
-							<ChevronIcon open={ui.archiveOpen} />
-							Closed sessions ({closed.length})
-						</button>
-					)}
-					{ui.archiveOpen && !focusedId && (
-						<ClosedSessions
-							sessions={closed}
-							tones={tones}
-							onReopen={(s) => void reopenSession(s)}
-							onRemove={(s) => void removeSession(s)}
-						/>
+							{state.loaded && !focusedId && (
+								<button
+									type="button"
+									className="section-toggle"
+									aria-expanded={ui.archiveOpen}
+									onClick={() => patchUi({ archiveOpen: !ui.archiveOpen })}
+								>
+									<ChevronIcon open={ui.archiveOpen} />
+									Closed sessions ({closed.length})
+								</button>
+							)}
+							{ui.archiveOpen && !focusedId && (
+								<ClosedSessions
+									sessions={closed}
+									tones={tones}
+									onReopen={(s) => void reopenSession(s)}
+									onRemove={(s) => void removeSession(s)}
+								/>
+							)}
+						</>
 					)}
 
 					<div className="demo">{providerSummary || 'Detecting agent tools…'}</div>
