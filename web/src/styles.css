@@ -90,24 +90,10 @@ body {
 	border-bottom: 1px solid var(--line);
 	flex-wrap: wrap;
 }
-#agent-home .logo {
-	width: 34px;
-	height: 34px;
-	display: grid;
-	place-items: center;
-	background: var(--soft);
-	border: 1px solid var(--line);
-	color: var(--ink);
-	border-radius: 9px;
-}
 #agent-home .top strong {
 	font-size: 19px;
 	font-weight: 700;
 	letter-spacing: -0.3px;
-}
-#agent-home .top .user {
-	color: var(--sub);
-	font-size: 19px;
 }
 #agent-home .live {
 	display: inline-flex;

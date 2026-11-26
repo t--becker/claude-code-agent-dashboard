@@ -619,7 +619,6 @@ export class SessionManager {
 	lastConfig: WorkspaceConfig = {
 		repoRoot: '',
 		projects: [],
-		userName: '',
 		anyLive: false,
 		folderPicker: false,
 		defaultPermissionMode: 'default',

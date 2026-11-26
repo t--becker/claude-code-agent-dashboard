@@ -166,7 +166,6 @@ export async function workspaceConfig(deps: AppDeps): Promise<WorkspaceConfig> {
 		...(avatar ? { avatar: `/api/avatar?v=${avatar.version}` } : {}),
 		repoRoot: deps.config.repoRoot,
 		projects: await listProjects(deps.config.repoRoot),
-		userName: deps.config.userName,
 		anyLive: deps.providerInfos().some((p) => p.mode === 'live'),
 		folderPicker: deps.config.folderPicker,
 		defaultPermissionMode: deps.manager.defaultPermissionMode,

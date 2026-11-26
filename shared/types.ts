@@ -151,7 +151,6 @@ export interface Session {
 export interface WorkspaceConfig {
 	repoRoot: string;
 	projects: string[];
-	userName: string;
 	anyLive: boolean;
 	/** Address of your own picture for your side of the chat, when the data folder holds one. */
 	avatar?: string;

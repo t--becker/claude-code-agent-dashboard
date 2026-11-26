@@ -5,7 +5,6 @@ import { FolderPrompt } from './FolderPrompt';
 const config = {
 	repoRoot: '/Users/me/repo',
 	projects: ['alpha', 'beta'],
-	userName: 'me',
 	anyLive: true,
 	folderPicker: false,
 	defaultPermissionMode: 'default' as const,

@@ -28,7 +28,7 @@ export default defineConfig({
 			`rm -rf ${dataDir} ${repoRoot}`,
 			`mkdir -p ${repoRoot}/alpha ${repoRoot}/beta`,
 			'npm run build',
-			`PORT=${port} DATA_DIR=${dataDir} REPO_ROOT=${repoRoot} FORCE_DEMO=1 FOLDER_PICKER=off DEMO_TURN_MS=500 WORKSPACE_USER=Sam npm start`,
+			`PORT=${port} DATA_DIR=${dataDir} REPO_ROOT=${repoRoot} FORCE_DEMO=1 FOLDER_PICKER=off DEMO_TURN_MS=500 npm start`,
 		].join(' && '),
 		url: `http://127.0.0.1:${port}/api/health`,
 		reuseExistingServer: false,

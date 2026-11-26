@@ -3,7 +3,7 @@ import { PERMISSION_MODES, type PermissionMode, type Session } from '@shared/typ
 import { AgentCard } from './components/AgentCard';
 import { ClosedSessions } from './components/ClosedSessions';
 import { FolderPrompt } from './components/FolderPrompt';
-import { ChevronIcon, PlusIcon, TerminalIcon, YourPicture } from './components/icons';
+import { ChevronIcon, LogoMark, PlusIcon, YourPicture } from './components/icons';
 import { TopicLogos } from './components/TopicIcon';
 import { Notice } from './components/Notice';
 import { ReplyBanner } from './components/ReplyBanner';
@@ -222,11 +222,8 @@ export function App() {
 			<TopicLogos.Provider value={state.config?.logos ?? NO_LOGOS}>
 				<div id="agent-home">
 					<header className="top">
-						<div className="logo" aria-hidden="true">
-							<TerminalIcon size={18} />
-						</div>
+						<LogoMark />
 						<strong>Agent Dashboard</strong>
-						<span className="user">/ {state.config?.userName ?? '…'}</span>
 						<span
 							className={`live${state.connected ? ' on' : ' offline'}`}
 							role="status"

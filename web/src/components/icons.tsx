@@ -60,6 +60,18 @@ export const ChevronIcon = ({ size = 16, open = false }: IconProps & { open?: bo
 	/>
 );
 
+/** The product mark: three chats stacked, the front one speaking. Also the tab icon. */
+export function LogoMark({ size = 38 }: IconProps) {
+	return (
+		<svg width={size} height={size} viewBox="0 0 1254 1254" aria-hidden="true" focusable={false}>
+			<rect x="306" y="86" width="871" height="690" rx="82" fill="#7417e8" />
+			<rect x="188" y="223" width="870" height="690" rx="82" fill="#fbad00" />
+			<rect x="72" y="360" width="870" height="692" rx="86" fill="#dd0454" />
+			<path d="M192 1040 186 1166q2 30 32 16l188-142z" fill="#dd0454" />
+		</svg>
+	);
+}
+
 /** The mark in front of a status word: a tick when done, a dot otherwise. */
 export function StatusMark({ state, ready }: { state: AgentState; ready?: boolean }) {
 	if (state === 'Done' && !ready)

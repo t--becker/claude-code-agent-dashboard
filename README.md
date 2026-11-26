@@ -155,7 +155,6 @@ Set these as environment variables when you start the server.
 | `PORT` / `HOST`     | `4848` / `127.0.0.1`            | Where the server listens. Keep `HOST` on localhost.  |
 | `REPO_ROOT`         | your projects folder, else home | Where the folder chooser starts                      |
 | `DATA_DIR`          | `~/.agent-workspace`            | Where chats, settings and attachments are kept       |
-| `WORKSPACE_USER`    | your OS username                | Name shown in the header                             |
 | `AUTO_MIRROR`       | on                              | `0` stops chats open elsewhere appearing on the page |
 | `FOLDER_PICKER`     | on (macOS only)                 | `off` asks for the folder on the page instead        |
 | `FORCE_DEMO`        | unset                           | `1` simulates every agent                            |

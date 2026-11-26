@@ -11,7 +11,6 @@ export interface ServerConfig {
 	forceDemo: boolean;
 	autoMirror: boolean;
 	demoTurnMs: number;
-	userName: string;
 	staticDir: string;
 	production: boolean;
 	/** Whether New agent may open this machine's folder chooser (macOS; FOLDER_PICKER=off disables). */
@@ -50,7 +49,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
 		forceDemo: env.FORCE_DEMO === '1' || env.FORCE_DEMO === 'true',
 		autoMirror: !(env.AUTO_MIRROR === '0' || env.AUTO_MIRROR === 'false'),
 		demoTurnMs: Number(env.DEMO_TURN_MS ?? 6000),
-		userName: env.WORKSPACE_USER ?? os.userInfo().username,
 		staticDir: path.resolve(here, '..', 'dist', 'web'),
 		production: env.NODE_ENV === 'production',
 		folderPicker: process.platform === 'darwin' && env.FOLDER_PICKER !== 'off',
