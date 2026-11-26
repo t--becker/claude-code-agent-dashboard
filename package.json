@@ -1,0 +1,64 @@
+{
+	"name": "claude-code-agent-dashboard",
+	"version": "0.1.0",
+	"private": true,
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/t--becker/claude-code-agent-dashboard.git"
+	},
+	"type": "module",
+	"description": "A local dashboard for Claude Code agents: one page to start, watch, answer and find every chat.",
+	"engines": {
+		"node": ">=22"
+	},
+	"scripts": {
+		"dev": "concurrently -n server,web -c blue,green \"npm:dev:server\" \"npm:dev:web\"",
+		"dev:server": "tsx watch server/index.ts",
+		"dev:web": "vite",
+		"build": "vite build",
+		"start": "NODE_ENV=production tsx server/index.ts",
+		"typecheck": "tsc --noEmit",
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"test:e2e": "playwright test",
+		"lint": "eslint .",
+		"format": "prettier --write .",
+		"format:check": "prettier --check ."
+	},
+	"dependencies": {
+		"@anthropic-ai/claude-agent-sdk": "^0.3.318",
+		"@fontsource-variable/figtree": "^5.3.0",
+		"@hono/node-server": "^2.1.6",
+		"hono": "^4.13.16",
+		"lucide-react": "^1.81.0",
+		"react": "^19.3.1",
+		"react-dom": "^19.3.1",
+		"react-markdown": "^10.1.0",
+		"remark-gfm": "^4.0.1",
+		"ws": "^8.22.1"
+	},
+	"devDependencies": {
+		"@eslint/js": "^10.0.1",
+		"@playwright/test": "^1.58.2",
+		"@testing-library/jest-dom": "^7.0.1",
+		"@testing-library/react": "^16.3.3",
+		"@testing-library/user-event": "^14.6.8",
+		"@types/node": "^26.6.6",
+		"@types/react": "^19.3.0",
+		"@types/react-dom": "^19.3.0",
+		"@types/ws": "^8.18.2",
+		"@vitejs/plugin-react": "^6.2.1",
+		"concurrently": "^10.0.6",
+		"eslint": "^10.14.0",
+		"eslint-plugin-react-hooks": "^7.1.1",
+		"globals": "^17.14.0",
+		"jsdom": "^29.1.1",
+		"prettier": "^3.9.10",
+		"tsx": "^4.23.15",
+		"typescript": "^6.0.3",
+		"typescript-eslint": "^8.72.1",
+		"vite": "^8.3.5",
+		"vitest": "^5.1.0"
+	}
+}

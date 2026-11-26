@@ -1,0 +1,6 @@
+node_modules
+dist
+design-reference.html
+playwright-report
+test-results
+data
