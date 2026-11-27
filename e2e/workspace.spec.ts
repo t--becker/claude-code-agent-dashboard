@@ -216,28 +216,20 @@ test('answers a pending question and surfaces a failed turn as Error', async ({ 
 	await card.getByLabel('Prompt Decision maker').fill('');
 });
 
-test('closing takes a running session off the page and under Closed without stopping it; undo and reopen bring it back', async ({
+test('closing takes a running session off the page and under Closed without stopping it; reopening brings it back', async ({
 	page,
 }) => {
 	const card = await createAgent(page, 'Background worker', 'decide something slowly', 'alpha');
 	await expectState(card, 'Needs input');
 	await card.getByRole('button', { name: 'Close Background worker' }).click();
 	await expect(card).toBeHidden();
-	await expect(
-		page.getByRole('status').filter({ hasText: 'Background worker closed' })
-	).toContainText('Still running, under Closed.');
+	// It goes quietly: no notice, no undo.
+	await expect(page.locator('.notice')).toHaveCount(0);
 	// The Closed chip sits after Running and Done, and counts it.
 	const closedChip = page.getByRole('button', { name: /^Closed \d+$/ });
 	await expect(closedChip).toHaveText('Closed 1');
 	await expect(page.locator('.chips .chip').last()).toHaveText('Closed 1');
 
-	await page.getByRole('button', { name: 'Undo close' }).click();
-	await expect(card).toBeVisible();
-	await expectState(card, 'Needs input');
-	await expect(closedChip).toHaveText('Closed 0');
-
-	await card.getByRole('button', { name: 'Close Background worker' }).click();
-	await expect(card).toBeHidden();
 	// The chip shows what is closed, in place of the agents.
 	await closedChip.click();
 	await expect(page.locator('section.agent:visible')).toHaveCount(0);

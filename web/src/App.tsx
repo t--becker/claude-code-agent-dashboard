@@ -38,11 +38,7 @@ export function App() {
 		setView(next);
 	};
 
-	const [notice, setNotice] = useState<{
-		sessionId?: string;
-		message: string;
-		undo?: () => void;
-	} | null>(null);
+	const [notice, setNotice] = useState<{ message: string } | null>(null);
 
 	const patchUi = useCallback((patch: Partial<UiState>) => {
 		setUi((prev) => ({ ...prev, ...patch }));
@@ -171,13 +167,8 @@ export function App() {
 
 	const closeSession = async (session: Session) => {
 		await actions.close(session.id);
+		// It goes quietly: the Closed chip counts it, and reopens it from there.
 		if (focusedId === session.id) patchUi({ focusedId: null });
-		const running = session.state === 'Running' || session.state === 'Needs input';
-		setNotice({
-			sessionId: session.id,
-			message: `${session.title} closed. ${running ? 'Still running, under Closed.' : 'Kept under Closed.'}`,
-			undo: () => void reopenSession(session),
-		});
 	};
 
 	const reopenSession = async (session: Session) => {
@@ -406,13 +397,7 @@ export function App() {
 								/>
 							)}
 
-							{notice && (
-								<Notice
-									message={notice.message}
-									onUndo={notice.undo}
-									onDismiss={() => setNotice(null)}
-								/>
-							)}
+							{notice && <Notice message={notice.message} onDismiss={() => setNotice(null)} />}
 
 							{banners.map((session) => (
 								<ReplyBanner

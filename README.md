@@ -66,6 +66,29 @@ done.
 To try it without Claude Code, run `FORCE_DEMO=1 npm start`: agents are simulated and nothing on
 disk is changed.
 
+## Keep it running (macOS)
+
+`npm start` stops when its terminal closes. To have the dashboard always there, install it as a
+background service instead:
+
+```sh
+npm run service:install
+```
+
+It starts when you log in, restarts itself if it stops, and keeps running with no terminal or
+editor open. Your chats are the same either way.
+
+| Command                     | What it does                                           |
+| --------------------------- | ------------------------------------------------------ |
+| `npm run service:restart`   | Rebuild and restart, after you pull or change the code |
+| `npm run service:status`    | Say whether it is running                              |
+| `npm run service:logs`      | Show the end of its log (`~/.agent-workspace/logs`)    |
+| `npm run service:uninstall` | Stop it and remove it; your chats are kept             |
+
+The service takes the `PATH` from your login shell when you install it, so agents can run the
+same commands you can. Install again after you add tools to your `PATH`. Settings such as `PORT`
+or `REPO_ROOT` given to `service:install` are kept.
+
 ## Three ways people use it
 
 **Research.** Start an agent in a notes folder and ask it to compare options, read a set of
@@ -200,8 +223,8 @@ Set these as environment variables when you start the server.
 - It is a tool for one person on one machine. There is no login and no sharing.
 - A chat that is running in VS Code or a terminal is mirrored, not controlled: you can read it
   here, and sending a prompt from its card continues it here as a separate branch.
-- The server must be running for the page to work. Chats are saved, so restarting loses nothing
-  except a turn that was in progress.
+- The server must be running for the page to work (see [Keep it running](#keep-it-running-macos)).
+  Chats are saved, so restarting loses nothing except a turn that was in progress.
 - Topic icons are suggested by matching keywords, so they are sometimes off. Click one to change
   it.
 - Codex support is experimental.

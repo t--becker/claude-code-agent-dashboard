@@ -6,12 +6,24 @@ export interface PickedFolder {
 }
 
 // The start folder is passed as an argument, never spliced into the script text.
+//
+// Written in JavaScript for Automation so the chooser can be brought to the front with AppKit's
+// own call. AppleScript's "tell me to activate" does the same but holds the chooser back by about
+// two seconds; this way it appears in under one, still in front of the browser.
 const SCRIPT = [
-	'on run argv',
-	'tell me to activate',
-	'POSIX path of (choose folder with prompt "Choose the project folder for the new agent" default location (POSIX file (item 1 of argv)))',
-	'end run',
-];
+	'function run(argv) {',
+	"	ObjC.import('AppKit');",
+	'	$.NSApplication.sharedApplication.activateIgnoringOtherApps(true);',
+	'	const app = Application.currentApplication();',
+	'	app.includeStandardAdditions = true;',
+	'	return app',
+	'		.chooseFolder({',
+	"			withPrompt: 'Choose the project folder for the new agent',",
+	'			defaultLocation: Path(argv[0]),',
+	'		})',
+	'		.toString();',
+	'}',
+].join('\n');
 
 let open: Promise<PickedFolder> | undefined;
 
@@ -23,8 +35,8 @@ let open: Promise<PickedFolder> | undefined;
 export function pickFolder(startDir: string): Promise<PickedFolder> {
 	// One chooser at a time; a second click while it is open waits for the same answer.
 	open ??= new Promise<PickedFolder>((resolve, reject) => {
-		const args = SCRIPT.flatMap((line) => ['-e', line]);
-		execFile('osascript', [...args, '--', startDir], { timeout: 10 * 60_000 }, (err, stdout) => {
+		const args = ['-l', 'JavaScript', '-e', SCRIPT, startDir];
+		execFile('osascript', args, { timeout: 10 * 60_000 }, (err, stdout) => {
 			if (!err) {
 				const picked = stdout.trim().replace(/\/+$/, '');
 				return resolve(picked ? { path: picked } : { cancelled: true });

@@ -103,8 +103,8 @@ own saved transcript.
 `Running` → `Done`, `Error`, or `Stopped` (you pressed Stop). `Needs input` is a Claude Code
 permission prompt or `AskUserQuestion`; answer it on the banner (Stop is there too), or in the
 chat's full view. Stop and Resume are run
-controls. Closing a card only moves it under _Closed_ and never stops the run; undo
-from the notice or reopen from the panel.
+controls. Closing a card only moves it under _Closed_ and never stops the run; reopen it from the
+**Closed** chip.
 
 The steps an agent takes between two messages show as one line: how many, which tools, and
 whether any failed. Unfolded (always, in the full view) each step is a row with the tool, what it

@@ -134,7 +134,6 @@ body {
 #agent-home .archive-toggle,
 #agent-home .archive-panel button,
 #agent-home .cancel-create,
-#agent-home .undo,
 #agent-home .dismiss,
 #agent-home .question button {
 	border: 1px solid var(--line-strong);
@@ -2006,10 +2005,6 @@ body {
 	padding: 9px 14px;
 	margin-bottom: 16px;
 	font-size: 14px;
-}
-#agent-home .notice .notice-actions {
-	display: flex;
-	gap: 6px;
 }
 #agent-home .folder-prompt {
 	display: flex;
