@@ -10,7 +10,7 @@ import {
 	LayoutGrid,
 	GitBranch,
 	LoaderCircle,
-	Maximize2,
+	Paperclip,
 	MessageCircle,
 	Minimize2,
 	Pencil,
@@ -35,7 +35,7 @@ export const PinIcon = ({ size = 16, filled = false }: IconProps & { filled?: bo
 	<Pin size={size} {...common} fill={filled ? 'currentColor' : 'none'} />
 );
 export const ChatIcon = ({ size = 16 }: IconProps) => <MessageCircle size={size} {...common} />;
-export const ExpandIcon = ({ size = 16 }: IconProps) => <Maximize2 size={size} {...common} />;
+export const ClipIcon = ({ size = 20 }: IconProps) => <Paperclip size={size} {...common} />;
 export const ShrinkIcon = ({ size = 16 }: IconProps) => <Minimize2 size={size} {...common} />;
 export const SendIcon = ({ size = 18 }: IconProps) => <Send size={size} {...common} />;
 export const PlusIcon = ({ size = 18 }: IconProps) => <Plus size={size} {...common} />;

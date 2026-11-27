@@ -66,6 +66,7 @@ export function makeActions(): WorkspaceActions {
 		setModel: vi.fn(async () => undefined),
 		setPermissionMode: vi.fn(async () => undefined),
 		setAllPermissions: vi.fn(async () => undefined),
+		setAllModels: vi.fn(async () => undefined),
 		answer: vi.fn(async () => undefined),
 		remove: vi.fn(async () => undefined),
 	};

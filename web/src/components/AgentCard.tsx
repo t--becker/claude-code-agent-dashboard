@@ -22,15 +22,7 @@ import { formatBytes, pastedFiles, readFiles, type ComposerFile } from '../lib/a
 import { isFresh, mirroredActivity } from '../lib/groups';
 import { readDraft, readScroll, writeDraft, writeScroll } from '../lib/uiState';
 import { CardMenu } from './CardMenu';
-import {
-	ExpandIcon,
-	PinIcon,
-	PlusIcon,
-	SendIcon,
-	SettingsIcon,
-	ShrinkIcon,
-	StatusMark,
-} from './icons';
+import { ClipIcon, PinIcon, SendIcon, ShrinkIcon } from './icons';
 import { OutputsBar } from './OutputsBar';
 import { PendingInputBox } from './PendingInputBox';
 import { TopicIcon } from './TopicIcon';
@@ -66,6 +58,34 @@ interface Props {
 	onShrink: () => void;
 	onClose: () => void;
 }
+
+/** Models offered first when the one a chat is on has run out, in this order. */
+const PREFERRED_FALLBACKS = ['opus', 'sonnet', 'default'];
+
+const LIMIT_TEXT =
+	/\b(?:reached|hit|exceeded|used up)\b.{0,40}\b(?:usage |rate |weekly |daily )?(?:limit|quota)\b|\busage limit\b/i;
+
+/**
+ * The chat's last word, when it is a short reply saying the model's usage limit is reached and
+ * nothing has been asked since; with the prompt that met it, to send again on another model.
+ */
+export function limitMessage(session: Session): { prompt?: string } | undefined {
+	const spoken = session.transcript.filter(
+		(entry) => entry.kind === 'user' || entry.kind === 'assistant' || entry.kind === 'error'
+	);
+	const last = spoken.at(-1);
+	if (!last || last.kind === 'user' || last.text.length > 300 || !LIMIT_TEXT.test(last.text))
+		return undefined;
+	const asked = spoken.findLast((entry) => entry.kind === 'user');
+	return { prompt: asked?.kind === 'user' && asked.text.trim() ? asked.text : undefined };
+}
+
+/** How close to the last message still counts as being at the end, in pixels. */
+const NEAR_END = 80;
+/** How long after a wheel, touch or key press a scroll is taken to be the reader's. */
+const INPUT_MS = 400;
+/** How long after the layout changes a scroll may be the layout's doing. */
+const SETTLE_MS = 250;
 
 const STATE_CLASS: Record<AgentState, string> = {
 	Running: '',
@@ -177,41 +197,101 @@ export function AgentCard({
 			: (scrollTop.current ?? el.scrollHeight);
 	}, [hidden, focused]);
 
-	// A card that changes place on the page is moved in the document, which resets its scroll to
-	// the top. Put the reader back: at the latest message, or wherever they had scrolled to.
-	useLayoutEffect(() => {
-		const el = outputRef.current;
-		if (!el || hidden || el.scrollTop !== 0) return;
-		if (pinnedToBottom.current) el.scrollTop = el.scrollHeight;
-		else if (scrollTop.current) el.scrollTop = scrollTop.current;
-	});
+	// Keeping a reader at the latest message.
+	//
+	// "At the end" is a decision the reader makes by scrolling, so it is only ever taken away by
+	// a scroll that was theirs. New content, a step folding shut, the card changing size or place:
+	// all of those move the scroll position too, and the browser reports each as a scroll. Read as
+	// the reader's own, they would leave the card stranded short of the end with a "New messages"
+	// button, which is what used to happen whenever several steps arrived at once.
+	const lastInput = useRef(0);
+	const pointerDown = useRef(false);
+	const settleUntil = useRef(0);
+	const measured = useRef({ content: 0, box: 0 });
 
-	// Follow new content only while the reader is already at the end; otherwise offer a jump.
-	const questionId = session.pendingInput?.id;
-	useEffect(() => {
+	/** After anything that may have changed the layout: stay at the end, or where the reader was. */
+	const stick = () => {
 		const el = outputRef.current;
 		if (!el || hidden) return;
-		if (pinnedToBottom.current) {
-			el.scrollTop = el.scrollHeight;
-			scrollTop.current = el.scrollTop;
-		} else {
-			setUnread(true);
+		if (el.scrollHeight !== measured.current.content || el.clientHeight !== measured.current.box) {
+			measured.current = { content: el.scrollHeight, box: el.clientHeight };
+			// For a moment after the layout changes, a scroll may be its doing and not the reader's.
+			settleUntil.current = performance.now() + SETTLE_MS;
 		}
-	}, [session.transcript.length, stream, questionId, hidden]);
+		if (pinnedToBottom.current) {
+			if (el.scrollHeight - el.scrollTop - el.clientHeight > 1) el.scrollTop = el.scrollHeight;
+		} else if (scrollTop.current && el.scrollTop === 0) {
+			// A card moved in the document has its scroll reset to the top; put the reader back.
+			el.scrollTop = scrollTop.current;
+		}
+	};
+	const stickRef = useRef(stick);
+	// Before the browser paints each update, so the end never shows a gap.
+	useLayoutEffect(() => {
+		stickRef.current = stick;
+		stick();
+	});
+	// And when something grows without an update from here: a picture loading, a step opened by
+	// hand, the message box getting taller.
+	useEffect(() => {
+		const el = outputRef.current;
+		if (!el || hidden || typeof ResizeObserver === 'undefined') return;
+		const observer = new ResizeObserver(() => stickRef.current());
+		observer.observe(el);
+		for (const child of el.children) observer.observe(child);
+		return () => observer.disconnect();
+	}, [hidden, focused]);
+
+	// When the reader is elsewhere in the chat, say that something new has arrived.
+	const questionId = session.pendingInput?.id;
+	const latest = `${session.transcript.at(-1)?.id ?? ''}|${stream ? 'stream' : ''}|${questionId ?? ''}`;
+	const noticed = useRef(latest);
+	useEffect(() => {
+		if (hidden || noticed.current === latest) return;
+		noticed.current = latest;
+		if (!pinnedToBottom.current) setUnread(true);
+	}, [latest, hidden]);
 
 	const scrollToEnd = () => {
 		const el = outputRef.current;
 		if (!el) return;
-		el.scrollTop = el.scrollHeight;
 		pinnedToBottom.current = true;
+		el.scrollTop = el.scrollHeight;
 		setUnread(false);
+	};
+
+	/** A wheel, a touch, a key or a press on the scrollbar: the next scroll is the reader's. */
+	const noteInput = () => {
+		lastInput.current = performance.now();
+	};
+	const onPointerDown = () => {
+		noteInput();
+		pointerDown.current = true;
+		const release = () => {
+			pointerDown.current = false;
+			noteInput();
+			window.removeEventListener('pointerup', release);
+			window.removeEventListener('pointercancel', release);
+		};
+		window.addEventListener('pointerup', release);
+		window.addEventListener('pointercancel', release);
 	};
 
 	const onScroll = () => {
 		const el = outputRef.current;
 		if (!el) return;
+		const atEnd = el.scrollHeight - el.scrollTop - el.clientHeight < NEAR_END;
+		const now = performance.now();
+		const theirs =
+			pointerDown.current || now - lastInput.current < INPUT_MS || now > settleUntil.current;
+		if (atEnd) pinnedToBottom.current = true;
+		else if (theirs) pinnedToBottom.current = false;
+		else if (pinnedToBottom.current) {
+			// The layout moved it, not the reader: go back to the end and leave the decision alone.
+			stick();
+			return;
+		}
 		scrollTop.current = el.scrollTop;
-		pinnedToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
 		if (pinnedToBottom.current) setUnread(false);
 		if (scrollSaveTimer.current) clearTimeout(scrollSaveTimer.current);
 		// At the latest message nothing is saved, so the card reopens there however much has been added.
@@ -311,8 +391,37 @@ export function AgentCard({
 			? 'Sending continues this chat here as its own branch'
 			: undefined;
 
+	// A reply saying the model's usage limit is reached is the end of the road on that model:
+	// offer another one, and to send the last prompt again on it.
+	const limitReply = !isBusy ? limitMessage(session) : undefined;
+	const others = (provider?.models ?? []).filter((m) => m.id !== session.model);
+	const [switchTo, setSwitchTo] = useState<string>();
+	const suggested =
+		switchTo && others.some((m) => m.id === switchTo)
+			? switchTo
+			: (
+					PREFERRED_FALLBACKS.map(
+						(name) => others.find((m) => m.id === name) ?? others.find((m) => m.id.includes(name))
+					).find(Boolean) ?? others[0]
+				)?.id;
+	const switchAndRetry = (model: string) =>
+		void run(async () => {
+			await actions.setModel(session.id, model);
+			if (limitReply?.prompt) await actions.prompt(session.id, limitReply.prompt);
+		});
+
 	const settings = (
 		<div className="settings">
+			{!focused && (
+				<button
+					type="button"
+					className="icon-btn settings-close"
+					aria-label="Close settings"
+					onClick={() => setShowSettings(false)}
+				>
+					×
+				</button>
+			)}
 			<div className="model-settings">
 				<label>
 					Agent tool
@@ -474,14 +583,15 @@ export function AgentCard({
 						</div>
 					)}
 					<div className="status-line">
-						<StatusMark state={shownState} ready={fresh} />
-						<span className="status">{statusLabel}</span>
-						<span className="elapsed">
-							{shownState === 'Running' ? (
-								<Stopwatch key={runSince} since={runSince} />
-							) : fresh ? null : (
-								activityLabel(session, shownState, now)
-							)}
+						<span className="status-pill">
+							<span className="status">{statusLabel}</span>
+							<span className="elapsed">
+								{shownState === 'Running' ? (
+									<Stopwatch key={runSince} since={runSince} />
+								) : fresh ? null : (
+									activityLabel(session, shownState, now)
+								)}
+							</span>
 						</span>
 						<span className="meta" title={session.path}>
 							{session.project} / {session.branch}
@@ -516,6 +626,15 @@ export function AgentCard({
 						...(onTogglePin
 							? [{ label: pinned ? 'Unpin' : 'Pin to the front', onSelect: onTogglePin }]
 							: []),
+						{
+							label: `Change model (${modelLabel(selectedModel)})`,
+							onSelect: () => {
+								if (!focused) return setShowSettings(true);
+								// The full view keeps them at the top of the chat: go there and stay there.
+								pinnedToBottom.current = false;
+								outputRef.current?.scrollTo({ top: 0 });
+							},
+						},
 						{ label: 'Rename', onSelect: startRename },
 						{ label: 'Change icon', onSelect: () => setPickingIcon(true) },
 						{ label: 'Close', onSelect: onClose, danger: true },
@@ -523,7 +642,16 @@ export function AgentCard({
 				/>
 			</div>
 
-			<div className="output" ref={outputRef} onScroll={onScroll}>
+			<div
+				className="output"
+				ref={outputRef}
+				onScroll={onScroll}
+				onWheel={noteInput}
+				onTouchStart={noteInput}
+				onTouchMove={noteInput}
+				onKeyDown={noteInput}
+				onPointerDown={onPointerDown}
+			>
 				{focused && settings}
 
 				{session.transcript.length === 0 && !stream && shownState !== 'Running' && (
@@ -542,7 +670,33 @@ export function AgentCard({
 					activity={shownActivity}
 					cwd={session.path}
 					provider={session.provider}
+					detailed={focused}
 				>
+					{limitReply && suggested && (
+						<div className="limit-notice" role="group" aria-label="Usage limit reached">
+							<span>{modelLabel(session.model)} has reached its usage limit.</span>
+							<select
+								aria-label="Model to switch to"
+								value={suggested}
+								disabled={busy}
+								onChange={(event) => setSwitchTo(event.target.value)}
+							>
+								{others.map((m) => (
+									<option key={m.id} value={m.id}>
+										{m.label}
+									</option>
+								))}
+							</select>
+							<button
+								type="button"
+								className="primary"
+								disabled={busy}
+								onClick={() => switchAndRetry(suggested)}
+							>
+								{limitReply.prompt ? 'Switch and send again' : 'Switch model'}
+							</button>
+						</div>
+					)}
 					{session.pendingInput && session.state === 'Needs input' && (
 						<div ref={questionRef}>
 							<PendingInputBox
@@ -594,10 +748,28 @@ export function AgentCard({
 					</div>
 				)}
 				<div className="prompt">
+					<label
+						className="attach"
+						title="Attach files of any type. You can also paste or drop them."
+					>
+						<input
+							id={`attach-${session.id}`}
+							type="file"
+							className="visually-hidden"
+							aria-label={`Attach files to ${session.title}`}
+							multiple
+							onChange={(event) => {
+								void addFiles([...(event.target.files ?? [])]);
+								event.target.value = '';
+							}}
+						/>
+						<ClipIcon />
+					</label>
 					<textarea
 						ref={promptRef}
 						rows={1}
 						placeholder={placeholder}
+						title={hint}
 						aria-label={`Prompt ${session.title}`}
 						value={draft}
 						onPaste={(event) => {
@@ -612,71 +784,29 @@ export function AgentCard({
 						}}
 						onKeyDown={onKeyDown}
 					/>
-					<div className="prompt-tools">
-						<label
-							className="attach icon-btn"
-							title="Attach files of any type. You can also paste or drop them."
-						>
-							<input
-								id={`attach-${session.id}`}
-								type="file"
-								className="visually-hidden"
-								aria-label={`Attach files to ${session.title}`}
-								multiple
-								onChange={(event) => {
-									void addFiles([...(event.target.files ?? [])]);
-									event.target.value = '';
-								}}
-							/>
-							<PlusIcon />
-						</label>
-						{!focused && (
-							<button
-								type="button"
-								className={`icon-btn${showSettings ? ' on' : ''}`}
-								aria-label={`Settings for ${session.title}`}
-								aria-pressed={showSettings}
-								title="Model and permissions for the next prompt"
-								onClick={() => setShowSettings(!showSettings)}
-							>
-								<SettingsIcon />
-							</button>
-						)}
-						<span className={`prompt-foot${error ? ' problem' : ''}`}>{error ?? hint}</span>
-						{controlLabel && (
-							<button
-								type="button"
-								className="run-control"
-								disabled={busy}
-								onClick={() =>
-									void run(() => (isBusy ? actions.stop(session.id) : actions.resume(session.id)))
-								}
-							>
-								{controlLabel}
-							</button>
-						)}
-						{!focused && (
-							<button
-								type="button"
-								className="icon-btn"
-								aria-label={`Expand ${session.title}`}
-								title="Open in the full view"
-								onClick={onExpand}
-							>
-								<ExpandIcon />
-							</button>
-						)}
+					{controlLabel && (
 						<button
-							type="submit"
-							className="send"
-							aria-label="Send"
-							title="Send (Enter). Shift+Enter adds a line."
-							disabled={isBusy || busy || (!draft.trim() && !files.length)}
+							type="button"
+							className="run-control"
+							disabled={busy}
+							onClick={() =>
+								void run(() => (isBusy ? actions.stop(session.id) : actions.resume(session.id)))
+							}
 						>
-							<SendIcon />
+							{controlLabel}
 						</button>
-					</div>
+					)}
+					<button
+						type="submit"
+						className="send"
+						aria-label="Send"
+						title="Send (Enter). Shift+Enter adds a line."
+						disabled={isBusy || busy || (!draft.trim() && !files.length)}
+					>
+						<SendIcon />
+					</button>
 				</div>
+				{error && <div className="prompt-foot problem">{error}</div>}
 			</form>
 		</section>
 	);

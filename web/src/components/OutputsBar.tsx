@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
 	AppWindow,
 	ArrowRight,
+	ArrowUpRight,
 	BookOpenText,
 	ChartColumn,
 	CodeXml,
@@ -126,9 +127,13 @@ function CodeChanges({
 	);
 }
 
+/** How many outputs are named on the line itself; the rest wait behind "+N more". */
+const INLINE = 2;
+
 /**
- * What the chat has made, kept at the foot of the card: pages, tickets, artifacts, files and
- * code changes. One line when folded; a list that opens each thing when unfolded.
+ * What the chat has made, on one line at the foot of the card: the newest few as links, the
+ * rest a click away. Pages, tickets, artifacts and files open in a new tab; code changes open
+ * the edits themselves.
  */
 export function OutputsBar({ outputs, transcript, title }: Props) {
 	const [open, setOpen] = useState(false);
@@ -157,15 +162,63 @@ export function OutputsBar({ outputs, transcript, title }: Props) {
 	const code = outputs.find((output) => output.kind === 'code');
 	// Newest first: what the chat made last is what you most likely want.
 	const listed = [...outputs].reverse();
+	const hrefOf = (output: ChatOutput) =>
+		output.url ?? (output.file ? `${FILE_ROUTE}${encodeURI(output.file)}` : undefined);
+	const openCode = () => {
+		// The panel takes over from the list, so Escape has one thing to close.
+		setOpen(false);
+		setShowCode(true);
+	};
 
 	return (
-		<div className="outputs" ref={wrap}>
+		<div className="outputs" ref={wrap} role="group" aria-label={`Outputs of ${title}`}>
+			<span className="outputs-label">Outputs</span>
+			{listed.slice(0, INLINE).map((output) => {
+				const Icon = ICONS[output.kind] ?? LinkIcon;
+				const href = hrefOf(output);
+				const hint = `${output.label} · ${output.verb}`;
+				if (output.kind === 'code')
+					return (
+						<button key={output.key} type="button" className="output-link" onClick={openCode}>
+							<Icon size={18} strokeWidth={1.9} aria-hidden="true" />
+							<span>View diff ({output.label})</span>
+						</button>
+					);
+				return href ? (
+					<a
+						key={output.key}
+						className="output-link"
+						href={href}
+						target="_blank"
+						rel="noreferrer"
+						title={hint}
+					>
+						<Icon size={18} strokeWidth={1.9} aria-hidden="true" />
+						<span>{output.title}</span>
+						<ArrowUpRight size={15} strokeWidth={2} aria-hidden="true" />
+					</a>
+				) : (
+					<span key={output.key} className="output-link plain" title={hint}>
+						<Icon size={18} strokeWidth={1.9} aria-hidden="true" />
+						<span>{output.title}</span>
+					</span>
+				);
+			})}
+			{listed.length > INLINE && (
+				<button
+					type="button"
+					className="outputs-more"
+					aria-expanded={open}
+					onClick={() => setOpen(!open)}
+				>
+					+{listed.length - INLINE} more
+				</button>
+			)}
 			{open && (
-				<div className="outputs-list" role="list" aria-label={`Outputs of ${title}`}>
+				<div className="outputs-list" role="list" aria-label={`All outputs of ${title}`}>
 					{listed.map((output) => {
 						const Icon = ICONS[output.kind] ?? LinkIcon;
-						const href =
-							output.url ?? (output.file ? `${FILE_ROUTE}${encodeURI(output.file)}` : undefined);
+						const href = hrefOf(output);
 						const inner = (
 							<>
 								<span className={`output-icon kind-${output.kind}`}>
@@ -185,15 +238,7 @@ export function OutputsBar({ outputs, transcript, title }: Props) {
 						return (
 							<div key={output.key} role="listitem">
 								{output.kind === 'code' ? (
-									<button
-										type="button"
-										className="output-row"
-										onClick={() => {
-											// The panel takes over from the list, so Escape has one thing to close.
-											setOpen(false);
-											setShowCode(true);
-										}}
-									>
+									<button type="button" className="output-row" onClick={openCode}>
 										{inner}
 									</button>
 								) : href ? (
@@ -208,18 +253,6 @@ export function OutputsBar({ outputs, transcript, title }: Props) {
 					})}
 				</div>
 			)}
-			<button
-				type="button"
-				className="outputs-toggle"
-				aria-expanded={open}
-				onClick={() => setOpen(!open)}
-			>
-				<span className="outputs-caret" aria-hidden="true">
-					{open ? '▼' : '▶'}
-				</span>
-				<strong>Outputs · {outputs.length}</strong>
-				<span className="outputs-names">{listed.map((output) => output.title).join(' · ')}</span>
-			</button>
 			{showCode && code && (
 				<CodeChanges output={code} transcript={transcript} onClose={() => setShowCode(false)} />
 			)}

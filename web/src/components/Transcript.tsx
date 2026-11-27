@@ -17,6 +17,52 @@ interface Props {
 	cwd?: string;
 	/** Which agent tool is on the other side of the chat. */
 	provider?: ProviderId;
+	/** Shows each run of tool steps unfolded, for the full view. A card keeps them to one line. */
+	detailed?: boolean;
+}
+
+type ToolEntry = Extract<TranscriptEntry, { kind: 'tool' }>;
+
+/**
+ * The steps an agent took between two messages, as one quiet line: how many, which tools, and
+ * whether any failed. The conversation stays readable; the detail is a click away.
+ */
+function StepGroup({
+	steps,
+	currentId,
+	latestId,
+	open,
+}: {
+	steps: ToolEntry[];
+	currentId?: string;
+	latestId?: string;
+	open: boolean;
+}) {
+	const names = [...new Set(steps.map((step) => step.name.split('__').pop() ?? step.name))];
+	const failed = steps.filter((step) => step.isError).length;
+	return (
+		<details className={`steps${failed ? ' has-failed' : ''}`} open={open || undefined}>
+			<summary>
+				<ChevronIcon size={14} />
+				<strong>
+					{steps.length} step{steps.length === 1 ? '' : 's'}
+				</strong>
+				<span className="steps-names">
+					{names.slice(0, 4).join(', ')}
+					{names.length > 4 ? '…' : ''}
+				</span>
+				{failed > 0 && <span className="badge-failed">{failed} failed</span>}
+			</summary>
+			{steps.map((step) => (
+				<ToolStep
+					key={step.id}
+					entry={step}
+					current={step.id === currentId}
+					latest={step.id === latestId}
+				/>
+			))}
+		</details>
+	);
 }
 
 /** Long chats render their tail; the rest is one click away rather than slowing every update. */
@@ -103,17 +149,20 @@ export function Transcript({
 	children,
 	cwd,
 	provider = 'claude-code',
+	detailed = false,
 }: Props) {
 	const [showAll, setShowAll] = useState(false);
 	const hidden = showAll ? 0 : Math.max(0, entries.length - DEFAULT_VISIBLE_ENTRIES);
 	const visible = hidden ? entries.slice(hidden) : entries;
 	const agent = agentName(provider);
-	let lastTool = -1;
-	for (let i = visible.length - 1; i >= 0; i -= 1) {
-		if (visible[i]?.kind === 'tool') {
-			lastTool = i;
-			break;
-		}
+	const lastTool = visible.findLast((entry) => entry.kind === 'tool')?.id;
+	// Steps that follow one another are shown together, as one line between the messages.
+	const rows: (Exclude<TranscriptEntry, ToolEntry> | ToolEntry[])[] = [];
+	for (const entry of visible) {
+		const last = rows.at(-1);
+		if (entry.kind !== 'tool') rows.push(entry);
+		else if (Array.isArray(last)) last.push(entry);
+		else rows.push([entry]);
 	}
 	return (
 		<div className="response" aria-live="polite">
@@ -122,7 +171,17 @@ export function Transcript({
 					Show {hidden} earlier entries
 				</button>
 			)}
-			{visible.map((entry, index) => {
+			{rows.map((entry) => {
+				if (Array.isArray(entry))
+					return (
+						<StepGroup
+							key={entry[0]!.id}
+							steps={entry}
+							currentId={running ? lastTool : undefined}
+							latestId={lastTool}
+							open={detailed}
+						/>
+					);
 				switch (entry.kind) {
 					case 'user':
 						return (
@@ -184,15 +243,6 @@ export function Transcript({
 									</div>
 								</div>
 							</div>
-						);
-					case 'tool':
-						return (
-							<ToolStep
-								key={entry.id}
-								entry={entry}
-								current={running && index === lastTool}
-								latest={index === lastTool}
-							/>
 						);
 					case 'system':
 						return (

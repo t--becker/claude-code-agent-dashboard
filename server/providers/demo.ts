@@ -124,6 +124,15 @@ export class DemoProvider implements Provider {
 				await sleep(step);
 				if (cancelled) return;
 			}
+			// "usage limit" in the prompt answers the way Claude Code does when a model has run out.
+			if (/\busage limit\b/i.test(ctx.prompt)) {
+				ctx.emit({
+					type: 'assistant',
+					text: "You've reached your Fable limit. Switch to another model to continue.",
+				});
+				ctx.emit({ type: 'done' });
+				return;
+			}
 			if (/\bfail\b/i.test(ctx.prompt)) {
 				ctx.emit({ type: 'error', message: 'Demo failure requested by the prompt.' });
 				return;

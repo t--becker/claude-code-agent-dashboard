@@ -1,5 +1,4 @@
 import type { Session } from '@shared/types';
-import { sessionTones } from '../lib/sessionTone';
 import { TopicTile } from './TopicIcon';
 
 interface Props {
@@ -7,16 +6,16 @@ interface Props {
 	onReopen: (session: Session) => void;
 	onRemove: (session: Session) => void;
 	/** Each chat's colour, the same one its card had. */
-	tones?: ReturnType<typeof sessionTones>;
+	tones?: Map<string, number>;
 }
 
 export function ClosedSessions({ sessions, onReopen, onRemove, tones }: Props) {
 	return (
 		<section className="archive-panel" aria-label="Closed sessions">
-			<h3>Closed sessions</h3>
 			{sessions.length === 0 ? (
 				<p className="meta">
-					Closed agents will appear here. Closing a card does not stop its session.
+					Nothing closed. A card you close from its menu is kept here, ready to reopen; closing does
+					not stop its agent.
 				</p>
 			) : (
 				sessions.map((session) => (

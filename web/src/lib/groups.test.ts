@@ -20,7 +20,15 @@ describe('grouping cards', () => {
 
 	it('counts every open agent under exactly one chip', () => {
 		const all = [running, waiting, done, failed, fresh, mirrored];
-		expect(countByFilter(all)).toEqual({ all: 6, reply: 1, running: 2, done: 3 });
+		const put = makeSession({ id: 'away', state: 'Running', closed: true });
+		// A closed chat counts under Closed only, whatever its agent is doing.
+		expect(countByFilter([...all, put])).toEqual({
+			all: 6,
+			reply: 1,
+			running: 2,
+			done: 3,
+			closed: 1,
+		});
 		expect(filterOf(mirrored)).toBe('running');
 		expect(shownState(mirrored)).toBe('Running');
 		expect(isFresh(fresh)).toBe(true);

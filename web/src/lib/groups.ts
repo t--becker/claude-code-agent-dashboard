@@ -25,16 +25,24 @@ export const isFresh = (session: Session): boolean =>
 	shownState(session) === 'Done' && session.turns === 0 && session.transcript.length === 0;
 
 /** The filter chips above the cards. Every open agent falls under exactly one of the last three. */
-export type Filter = 'all' | 'reply' | 'running' | 'done';
+export type Filter = 'all' | 'reply' | 'running' | 'done' | 'closed';
 
-export function filterOf(session: Session): Exclude<Filter, 'all'> {
+export function filterOf(session: Session): Exclude<Filter, 'all' | 'closed'> {
 	const state = shownState(session);
 	if (state === 'Needs input') return 'reply';
 	return state === 'Running' ? 'running' : 'done';
 }
 
+/** Counts for the chips. The first four cover the open agents; Closed counts the ones put away. */
 export function countByFilter(sessions: Session[]): Record<Filter, number> {
-	const counts: Record<Filter, number> = { all: sessions.length, reply: 0, running: 0, done: 0 };
-	for (const session of sessions) counts[filterOf(session)] += 1;
+	const open = sessions.filter((session) => !session.closed);
+	const counts: Record<Filter, number> = {
+		all: open.length,
+		reply: 0,
+		running: 0,
+		done: 0,
+		closed: sessions.length - open.length,
+	};
+	for (const session of open) counts[filterOf(session)] += 1;
 	return counts;
 }

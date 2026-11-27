@@ -1,6 +1,6 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { AgentCard } from './AgentCard';
+import { AgentCard, limitMessage } from './AgentCard';
 import { TopicLogos } from './TopicIcon';
 import { claudeProvider, makeActions, makeSession } from '../tests/fixtures';
 
@@ -325,7 +325,7 @@ describe('AgentCard', () => {
 		expect(actions.setIcon).toHaveBeenCalledWith('session-1', null);
 	});
 
-	it('pins and opens the full view from the menu, and opens it from the message box too', async () => {
+	it('pins and opens the full view from the menu', async () => {
 		const onTogglePin = vi.fn();
 		const onExpand = vi.fn();
 		renderCard({ state: 'Done' }, { onTogglePin, onExpand });
@@ -335,8 +335,7 @@ describe('AgentCard', () => {
 		expect(onTogglePin).toHaveBeenCalledTimes(1);
 		await userEvent.click(more);
 		await userEvent.click(screen.getByRole('menuitem', { name: 'Open chat' }));
-		await userEvent.click(screen.getByRole('button', { name: 'Expand Storefront help links' }));
-		expect(onExpand).toHaveBeenCalledTimes(2);
+		expect(onExpand).toHaveBeenCalledTimes(1);
 	});
 
 	it('changes permissions for the next prompt from the expanded settings', async () => {
@@ -345,5 +344,81 @@ describe('AgentCard', () => {
 		expect(select).toHaveValue('default');
 		await userEvent.selectOptions(select, 'bypassPermissions');
 		expect(actions.setPermissionMode).toHaveBeenCalledWith('session-1', 'bypassPermissions');
+	});
+
+	describe('when the model runs out', () => {
+		const limited = (extra: Parameters<typeof makeSession>[0] = {}) =>
+			renderCard({
+				state: 'Done',
+				model: 'claude-sonnet-5-5',
+				transcript: [
+					{ id: 'u1', ts: 1, kind: 'user', text: 'can you get the latest reports' },
+					{
+						id: 'a1',
+						ts: 2,
+						kind: 'assistant',
+						text: "You've reached your Fable limit. Switch to another model to continue.",
+					},
+				],
+				...extra,
+			});
+
+		it('offers another model under the message, and sends the last prompt again on it', async () => {
+			const { actions } = limited();
+			const notice = screen.getByRole('group', { name: 'Usage limit reached' });
+			expect(notice).toHaveTextContent('Claude Sonnet 5.5 has reached its usage limit.');
+			// Opus is offered first, and the model that ran out is not offered at all.
+			const choice = within(notice).getByLabelText('Model to switch to');
+			expect(choice).toHaveValue('claude-opus-5-5');
+			expect(within(choice).queryByRole('option', { name: 'Claude Sonnet 5.5' })).toBeNull();
+			await userEvent.click(within(notice).getByRole('button', { name: 'Switch and send again' }));
+			expect(actions.setModel).toHaveBeenCalledWith('session-1', 'claude-opus-5-5');
+			expect(actions.prompt).toHaveBeenCalledWith('session-1', 'can you get the latest reports');
+		});
+
+		it('says nothing once something new has been asked, or while the agent is working', () => {
+			expect(
+				limitMessage(
+					makeSession({
+						transcript: [
+							{ id: 'a1', ts: 1, kind: 'assistant', text: "You've reached your Fable limit." },
+							{ id: 'u2', ts: 2, kind: 'user', text: 'try again' },
+						],
+					})
+				)
+			).toBeUndefined();
+			// A long reply that only mentions a limit is not a limit message.
+			expect(
+				limitMessage(
+					makeSession({
+						transcript: [
+							{
+								id: 'a1',
+								ts: 1,
+								kind: 'assistant',
+								text: `The rate card has reached the 25% limit on discounts. ${'More detail. '.repeat(40)}`,
+							},
+						],
+					})
+				)
+			).toBeUndefined();
+			limited({ state: 'Running' });
+			expect(screen.queryByRole('group', { name: 'Usage limit reached' })).toBeNull();
+		});
+	});
+
+	it('changes the model from the menu, without opening the full view', async () => {
+		const { actions } = renderCard({ state: 'Done' });
+		await userEvent.click(screen.getByRole('button', { name: 'More for Storefront help links' }));
+		await userEvent.click(
+			screen.getByRole('menuitem', { name: 'Change model (Claude Sonnet 5.5)' })
+		);
+		await userEvent.selectOptions(
+			screen.getByLabelText('Model for the next prompt'),
+			'claude-opus-5-5'
+		);
+		expect(actions.setModel).toHaveBeenCalledWith('session-1', 'claude-opus-5-5');
+		await userEvent.click(screen.getByRole('button', { name: 'Close settings' }));
+		expect(screen.queryByLabelText('Model for the next prompt')).toBeNull();
 	});
 });

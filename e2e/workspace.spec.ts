@@ -77,7 +77,8 @@ test('creates an agent card with the project, folder, tool, model and demo label
 		'Demo mode: Claude Code is not connected'
 	);
 	await expect(card.locator('.response .you .bubble')).toHaveText('Update the RCS help links');
-	await expect(page.getByRole('button', { name: 'Done 1', exact: true })).toBeVisible();
+	// Two finished now: this one and the long sample chat the suite starts with.
+	await expect(page.getByRole('button', { name: 'Done 2', exact: true })).toBeVisible();
 	await expect(page.getByRole('button', { name: 'Running 0', exact: true })).toBeVisible();
 	await expect(page.locator('.demo')).toContainText(
 		'Claude Code: demo mode (demo mode forced by FORCE_DEMO)'
@@ -113,12 +114,15 @@ test('expands into a focused view and shrinks back without losing the draft, his
 		.count();
 	await card.getByLabel('Prompt Onboarding links').fill('unsent draft');
 	const output = card.locator('.output');
-	await output.evaluate((el) => {
-		el.scrollTop = 60;
-	});
-	await expect.poll(() => output.evaluate((el) => el.scrollTop)).toBe(60);
+	// Scroll back the way a person does, with the wheel: up to the top, then a little way down.
+	await output.hover();
+	await page.mouse.wheel(0, -100000);
+	await expect.poll(() => output.evaluate((el) => el.scrollTop)).toBe(0);
+	await page.mouse.wheel(0, 60);
+	await expect.poll(() => output.evaluate((el) => el.scrollTop)).toBeGreaterThan(20);
+	const place = await output.evaluate((el) => el.scrollTop);
 
-	await card.getByRole('button', { name: 'Expand Onboarding links' }).click();
+	await fromMenu(card, 'Open chat');
 	await expect(page.locator('.grid')).toHaveClass(/focused/);
 	await expect(card).toHaveClass(/selected/);
 	await expect(other).toBeHidden();
@@ -128,7 +132,7 @@ test('expands into a focused view and shrinks back without losing the draft, his
 	await expect(card.locator('.response .msg, .response .step, .response .note')).toHaveCount(
 		historyCount
 	);
-	await expect.poll(() => output.evaluate((el) => el.scrollTop)).toBe(60);
+	await expect.poll(() => output.evaluate((el) => el.scrollTop)).toBe(place);
 
 	await card.getByRole('button', { name: 'Shrink Onboarding links' }).click();
 	await expect(page.locator('.grid')).not.toHaveClass(/focused/);
@@ -137,9 +141,9 @@ test('expands into a focused view and shrinks back without losing the draft, his
 	await expect(card.locator('.response .msg, .response .step, .response .note')).toHaveCount(
 		historyCount
 	);
-	await expect.poll(() => output.evaluate((el) => el.scrollTop)).toBe(60);
+	await expect.poll(() => output.evaluate((el) => el.scrollTop)).toBe(place);
 
-	await card.getByRole('button', { name: 'Expand Onboarding links' }).click();
+	await fromMenu(card, 'Open chat');
 	await page.keyboard.press('Escape');
 	await expect(page.locator('.grid')).not.toHaveClass(/focused/);
 	await card.getByLabel('Prompt Onboarding links').fill('');
@@ -149,7 +153,7 @@ test('a model change in the expanded view applies to the next prompt, not the cu
 	page,
 }) => {
 	const card = page.locator(CARD, { hasText: 'Dashboard' });
-	await card.getByRole('button', { name: 'Expand Dashboard' }).click();
+	await fromMenu(card, 'Open chat');
 	await card.getByLabel('Model for the next prompt').selectOption('claude-opus-5-5');
 	await expect(card.locator('.model-note')).toHaveText(
 		'Next prompt: Claude Opus 5.5. Current run stays on Claude Fable 5.1.'
@@ -212,7 +216,7 @@ test('answers a pending question and surfaces a failed turn as Error', async ({ 
 	await card.getByLabel('Prompt Decision maker').fill('');
 });
 
-test('closing moves a running session to Closed sessions without stopping it; undo and reopen bring it back', async ({
+test('closing takes a running session off the page and under Closed without stopping it; undo and reopen bring it back', async ({
 	page,
 }) => {
 	const card = await createAgent(page, 'Background worker', 'decide something slowly', 'alpha');
@@ -221,30 +225,41 @@ test('closing moves a running session to Closed sessions without stopping it; un
 	await expect(card).toBeHidden();
 	await expect(
 		page.getByRole('status').filter({ hasText: 'Background worker closed' })
-	).toContainText('Still running in Closed sessions.');
-	await expect(page.getByRole('button', { name: /Closed sessions \(1\)/ })).toBeVisible();
+	).toContainText('Still running, under Closed.');
+	// The Closed chip sits after Running and Done, and counts it.
+	const closedChip = page.getByRole('button', { name: /^Closed \d+$/ });
+	await expect(closedChip).toHaveText('Closed 1');
+	await expect(page.locator('.chips .chip').last()).toHaveText('Closed 1');
 
 	await page.getByRole('button', { name: 'Undo close' }).click();
 	await expect(card).toBeVisible();
 	await expectState(card, 'Needs input');
-	await expect(page.getByRole('button', { name: /Closed sessions \(0\)/ })).toBeVisible();
+	await expect(closedChip).toHaveText('Closed 0');
 
 	await card.getByRole('button', { name: 'Close Background worker' }).click();
-	await page.getByRole('button', { name: /Closed sessions \(1\)/ }).click();
+	await expect(card).toBeHidden();
+	// The chip shows what is closed, in place of the agents.
+	await closedChip.click();
+	await expect(page.locator('section.agent:visible')).toHaveCount(0);
 	const archived = page.locator('.archive-item', { hasText: 'Background worker' });
 	await expect(archived).toContainText('Needs input');
 	await archived.getByRole('button', { name: 'Reopen' }).click();
 	await expect(card).toBeVisible();
 	await card.getByRole('button', { name: 'Include the extended option' }).click();
 	await expectState(card, 'Done');
-	await page.getByRole('button', { name: /Closed sessions \(0\)/ }).click();
+	// Reopening went back to the agents on its own.
+	await expect(page.getByRole('button', { name: /^All \d+$/ })).toHaveAttribute(
+		'aria-pressed',
+		'true'
+	);
+	await expect(closedChip).toHaveText('Closed 0');
 });
 
 test('sessions, focus, drafts and closed sessions survive a reload', async ({ page }) => {
 	const dashboard = page.locator(CARD, { hasText: 'Dashboard' });
 	await fromMenu(dashboard, 'Close');
 	const card = page.locator(CARD, { hasText: 'Decision maker' });
-	await card.getByRole('button', { name: 'Expand Decision maker' }).click();
+	await fromMenu(card, 'Open chat');
 	await card.getByLabel('Prompt Decision maker').fill('draft that must survive');
 
 	await page.reload();
@@ -253,10 +268,10 @@ test('sessions, focus, drafts and closed sessions survive a reload', async ({ pa
 	await expect(card).toHaveClass(/selected/);
 	await expect(card.getByLabel('Prompt Decision maker')).toHaveValue('draft that must survive');
 	await expect(card.locator('.response')).toContainText('You answered: Keep it minimal');
-	await expect(page.locator('section.agent')).toHaveCount(3);
+	await expect(page.locator('section.agent')).toHaveCount(4);
 	await page.getByRole('button', { name: '← All agents' }).click();
-	await expect(page.getByRole('button', { name: /Closed sessions \(1\)/ })).toBeVisible();
-	await expect(page.locator('section.agent:visible')).toHaveCount(3);
+	await expect(page.getByRole('button', { name: 'Closed 1', exact: true })).toBeVisible();
+	await expect(page.locator('section.agent:visible')).toHaveCount(4);
 });
 
 test('sending a prompt jumps to the latest message, even after scrolling back through the history', async ({
@@ -265,9 +280,8 @@ test('sending a prompt jumps to the latest message, even after scrolling back th
 	const card = page.locator(CARD, { hasText: 'Onboarding links' });
 	const output = card.locator('.output');
 	const fromEnd = () => output.evaluate((el) => el.scrollHeight - el.scrollTop - el.clientHeight);
-	await output.evaluate((el) => {
-		el.scrollTop = 0;
-	});
+	await output.hover();
+	await page.mouse.wheel(0, -100000);
 	await expect.poll(fromEnd).toBeGreaterThan(100);
 
 	await card.getByLabel('Prompt Onboarding links').fill('one more turn');
@@ -457,13 +471,13 @@ test('a chat gets a topic icon from its first prompt, keeps the one you pick, an
 	expect(await tile.evaluate((el) => getComputedStyle(el).borderTopColor)).toBe(colour);
 	await page.getByRole('button', { name: '← All agents' }).click();
 	await fromMenu(card, 'Close');
-	await page.getByRole('button', { name: /Closed sessions/ }).click();
+	await page.getByRole('button', { name: /^Closed \d+$/ }).click();
 	const row = page.locator('.archive-item', { hasText: 'Credit maths' });
 	await expect(row.locator('.topic')).toHaveAttribute('title', 'Release');
 	expect(await row.locator('.topic').evaluate((el) => getComputedStyle(el).borderTopColor)).toBe(
 		colour
 	);
-	await page.getByRole('button', { name: /Closed sessions/ }).click();
+	await page.getByRole('button', { name: /^All \d+$/ }).click();
 });
 
 test('search finds a chat by its title or by what was said in it, open or closed, and opens it', async ({
@@ -541,18 +555,19 @@ test('the artifact library lists what agents published or made, previews it, and
 test('what a chat made is kept at the foot of its card and opens from there', async ({ page }) => {
 	const card = await createAgent(page, 'Status refresh', 'Fix the refresh and share the outputs');
 	await expectState(card, 'Done');
-	const toggle = card.getByRole('button', { name: /Outputs · 3/ });
-	await expect(toggle).toContainText('Summary page · DEMO-7 Fix the status refresh · Code changes');
-
-	await toggle.click();
-	const list = card.getByRole('list', { name: 'Outputs of Status refresh' });
-	await expect(list.getByRole('link', { name: /Summary page/ })).toHaveAttribute(
+	// The newest two are links on the line itself; the third waits behind "+1 more".
+	const bar = card.getByRole('group', { name: 'Outputs of Status refresh' });
+	await expect(bar.getByRole('link', { name: /Summary page/ })).toHaveAttribute(
 		'href',
 		'https://claude.ai/artifact/DemoSummary01'
 	);
-	const ticket = list.getByRole('link', { name: /DEMO-7 Fix the status refresh/ });
-	await expect(ticket).toContainText('Jira ticket · Created');
-	await expect(ticket).toHaveAttribute('href', 'https://example.atlassian.net/browse/DEMO-7');
+	await expect(bar.getByRole('link', { name: /DEMO-7 Fix the status refresh/ })).toHaveAttribute(
+		'href',
+		'https://example.atlassian.net/browse/DEMO-7'
+	);
+	await bar.getByRole('button', { name: '+1 more' }).click();
+	const list = card.getByRole('list', { name: 'All outputs of Status refresh' });
+	await expect(list.getByRole('link', { name: /DEMO-7/ })).toContainText('Jira ticket · Created');
 
 	// The bar and its list leave the chat itself alone: messages still stack and wrap.
 	const chat = card.locator('.output');
@@ -566,11 +581,98 @@ test('what a chat made is kept at the foot of its card and opens from there', as
 	await page.keyboard.press('Escape');
 	await expect(changes).toBeHidden();
 
-	// The list is still there after a reload, and a chat that made nothing has no bar.
+	// The steps the agent took are one line between the messages, unfolding on a click.
+	const steps = card.locator('details.steps').last();
+	await expect(steps.locator('> summary')).toContainText(/\d+ steps/);
+	await expect(steps.locator('.step').first()).toBeHidden();
+	await steps.locator('> summary').click();
+	await expect(steps.locator('.step').first()).toBeVisible();
+
+	// The outputs are still there after a reload, and a chat that made nothing has no bar.
 	await page.reload();
 	await live(page);
-	await expect(card.getByRole('button', { name: /Outputs · 3/ })).toBeVisible();
+	await expect(bar.getByRole('link', { name: /Summary page/ })).toBeVisible();
 	await expect(
-		page.locator(CARD, { hasText: 'Onboarding links' }).getByRole('button', { name: /Outputs/ })
+		page.locator(CARD, { hasText: 'Onboarding links' }).getByRole('group', { name: /^Outputs of/ })
 	).toHaveCount(0);
+});
+
+test('a long chat follows new messages while you are at the end, and holds still while you read back', async ({
+	page,
+}) => {
+	const card = page.locator(CARD, { hasText: 'Long history' });
+	const chat = card.locator('.output');
+	const fromEnd = () => chat.evaluate((el) => el.scrollHeight - el.scrollTop - el.clientHeight);
+	const jump = card.getByRole('button', { name: '↓ New messages' });
+	// Only the tail of the chat is on the page, and it opens at the latest message.
+	await expect(card.getByRole('button', { name: /^Show \d+ earlier entries$/ })).toBeAttached();
+	await expect.poll(fromEnd).toBeLessThan(5);
+
+	// Messages arriving from elsewhere (not sent from this card) are followed, one after another.
+	const prompt = (text: string) =>
+		page.request.post('/api/sessions/long-history/prompt', { data: { text } });
+	await prompt('first follow-up, share the outputs');
+	await expectState(card, 'Running');
+	await expectState(card, 'Done');
+	await expect(card.locator('.response .you .bubble').last()).toHaveText(
+		'first follow-up, share the outputs'
+	);
+	await expect.poll(fromEnd).toBeLessThan(5);
+	await expect(jump).toHaveCount(0);
+
+	// Scrolling back to read stops the following: the place is kept and the button offers the way back.
+	await chat.hover();
+	await page.mouse.wheel(0, -600);
+	await expect.poll(fromEnd).toBeGreaterThan(300);
+	const reading = card.getByText('Question 218', { exact: true });
+	const top = async () => (await reading.boundingBox())?.y ?? 0;
+	const before = await top();
+	await prompt('second follow-up');
+	await expectState(card, 'Running');
+	await expectState(card, 'Done');
+	await expect(jump).toBeVisible();
+	expect(Math.abs((await top()) - before)).toBeLessThan(3);
+
+	await jump.click();
+	await expect.poll(fromEnd).toBeLessThan(5);
+	await expect(jump).toHaveCount(0);
+	// Back at the end, following resumes.
+	await prompt('third follow-up, share the outputs');
+	await expectState(card, 'Running');
+	await expectState(card, 'Done');
+	await expect.poll(fromEnd).toBeLessThan(5);
+	await expect(jump).toHaveCount(0);
+});
+
+test('when a model runs out, the chat offers another and sends again; one switch moves every agent', async ({
+	page,
+}) => {
+	const card = await createAgent(page, 'Reports', 'get the latest reports, usage limit');
+	await expectState(card, 'Done');
+	const notice = card.getByRole('group', { name: 'Usage limit reached' });
+	await expect(notice).toContainText('Claude Fable 5.1 has reached its usage limit.');
+	await expect(notice.getByLabel('Model to switch to')).toHaveValue('claude-opus-5-5');
+
+	// One click: the chat moves to Opus and the same question is asked again on it.
+	await notice.getByRole('button', { name: 'Switch and send again' }).click();
+	await expect(card.locator('.response .you .bubble').last()).toHaveText(
+		'get the latest reports, usage limit'
+	);
+	await expect(card.locator('.response')).toContainText('Model changed to Claude Opus 5.5.');
+
+	// The workspace-wide switch puts every agent on one model from its next prompt.
+	await page.getByLabel('Model for all agents').selectOption('claude-sonnet-5-5');
+	await expect(page.getByRole('status').filter({ hasText: 'Every agent now uses' })).toContainText(
+		'Claude Sonnet 5.5'
+	);
+	const nextModels = async () => {
+		const body = (await (await page.request.get('/api/bootstrap')).json()) as {
+			sessions: { model: string; nextModel?: string; provider: string }[];
+		};
+		return [...new Set(body.sessions.map((s) => s.nextModel ?? s.model))];
+	};
+	await expect.poll(nextModels).toEqual(['claude-sonnet-5-5']);
+	await page.reload();
+	await live(page);
+	await expect(page.getByLabel('Model for all agents')).toHaveValue('claude-sonnet-5-5');
 });

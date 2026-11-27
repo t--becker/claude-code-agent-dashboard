@@ -38,23 +38,25 @@ describe('Transcript', () => {
 				<div>question box</div>
 			</Transcript>
 		);
-		// Each row with its clock time taken out: who spoke or which tool ran, then what was said.
-		const texts = [...document.querySelectorAll('.response > *')].map((el) => {
-			const copy = el.cloneNode(true) as Element;
-			copy.querySelectorAll('time').forEach((time) => time.remove());
-			return copy.textContent?.trim();
-		});
-		expect(texts).toEqual([
-			'YouRun the tests',
-			'Bashnpm test12 passed',
-			'Bashnpm run lintFailedboom',
-			'Readsrc/app.ts',
-			'ClaudeAll green.',
-			'Stopped by you.',
-			'Error: exit 1',
-			'Claudestill typ',
-			'question box',
+		// The conversation in order, with the three steps between the messages as one line.
+		const rows = [...document.querySelectorAll('.response > *')].map((el) => el.className);
+		expect(rows).toEqual([
+			'msg you',
+			'steps has-failed',
+			'msg agent-msg',
+			'note',
+			'note error-note',
+			'msg agent-msg',
+			'',
 		]);
+		const group = document.querySelector('details.steps')!;
+		expect(group).not.toHaveAttribute('open');
+		const line = group.querySelector('summary')!;
+		expect(line).toHaveTextContent('3 steps');
+		expect(line).toHaveTextContent('Bash, Read');
+		expect(line).toHaveTextContent('1 failed');
+		expect(screen.getByText('green').closest('.msg')).toHaveTextContent(/^Claude/);
+		expect(screen.getByText('still typ').closest('.msg')).toHaveTextContent(/^Claude/);
 		expect(document.querySelectorAll('.response time')).toHaveLength(5);
 		// A step that went fine is folded; a click opens it. One that failed is open already.
 		const first = screen.getByText('npm test').closest('details')!;
@@ -115,6 +117,25 @@ describe('Transcript', () => {
 			</YourPicture.Provider>
 		);
 		expect(container.querySelector('.avatar-you img')).toHaveAttribute('src', '/api/avatar?v=1');
+	});
+
+	it('unfolds the steps in the full view, and names a single step without a plural', () => {
+		const one: TranscriptEntry[] = [
+			{ id: 'u', ts: 1, kind: 'user', text: 'Check it' },
+			{
+				id: 't',
+				ts: 2,
+				kind: 'tool',
+				name: 'mcp__tracker__getIssue',
+				summary: 'OPS-1',
+				output: 'ok',
+			},
+		];
+		render(<Transcript entries={one} running={false} detailed />);
+		const group = document.querySelector('details.steps')!;
+		expect(group).toHaveAttribute('open');
+		// A connected tool is named by what it does, not by its full address.
+		expect(group.querySelector('summary')).toHaveTextContent(/^1 stepgetIssue$/);
 	});
 
 	it('shows only the tail of a long chat until asked for the rest', async () => {

@@ -6,18 +6,21 @@ How the dashboard works underneath. For getting started, see the [README](../REA
 
 - **The page.** Agents waiting for your reply come first, each as a banner with the question, the
   replies on offer and a box for your own. Below is one grid with a card for every open agent,
-  running or finished, in the order you arranged them. **Closed sessions** at the bottom holds
-  the cards you closed yourself, each ready to reopen.
+  running or finished, in the order you arranged them. The **Closed** chip, beside Running and Done,
+  shows the chats you closed, each ready to reopen.
 - **Search.** The box at the top (⌘K, or Ctrl+K) looks through every chat the workspace holds,
   open and closed: titles, project names, your prompts, the replies and the tool steps. Every
   word you type must appear in the title or in one message. Chats matched by title come first,
   then the most recently active. Enter or a click opens the chat in the full view; a closed
   chat is reopened first. It searches what the workspace keeps of each chat, which for a very long one is its most recent 1,500 to 2,000 entries.
 - **Chips.** All, Running and Done filter the page and count the open agents; Needs reply joins
-  them when an agent is waiting. Done covers finished, stopped and failed.
+  them when an agent is waiting. Done covers finished, stopped and failed. **Closed** lists the
+  chats you have put away. Closing a card (from its "…" menu) takes it off the page at once and
+  keeps it there, even when it mirrors a chat that is still open in VS Code; it comes back only
+  when you reopen it.
 - **The "…" on a card** holds Open chat, Pin, Rename, Change icon and Close. Double-clicking the
-  title also renames; clicking the icon also changes it; the arrows in the message box also open
-  the full view; the sliders there show the model and permissions for the next prompt.
+  title also renames, and clicking the icon also changes it. Open chat gives the full view, where
+  the model, permissions, project and branch are.
 - **Topic icon.** Each chat has an icon left of its title, in the chat's own colour, for the kind
   of work it holds. It is suggested from the title and the first prompt (`shared/topics.ts`:
   keywords per topic, the title weighted above the prompt), never from the repo, since unrelated
@@ -25,7 +28,7 @@ How the dashboard works underneath. For getting started, see the [README](../REA
   prompt. Click the icon to pick another: your pick is saved with the chat and nothing replaces
   it, and the picker offers the suggestion back. Until you pick, a rename can change the
   suggestion; later prompts do not. The same icon shows on the card, in the full view, on the
-  reply banner, in search results and in the Closed sessions list. Topics are line icons from lucide; a picture named after a topic id in `~/.agent-workspace/logos` replaces its icon.
+  reply banner, in search results and in the Closed list. Topics are line icons from lucide; a picture named after a topic id in `~/.agent-workspace/logos` replaces its icon.
 - **Pin.** Pinning a card (from its menu) keeps it at the front of the grid; a pinned card shows
   a pin beside its title, which unpins it.
 - **Your picture.** Put a picture at `~/.agent-workspace/avatar.png` (or `.jpg`, `.webp`, `.gif`,
@@ -78,7 +81,7 @@ experimental. Claude Code is the supported tool.
 Chats that a running Claude Code process has open appear in the workspace on their own: the
 server reads `~/.claude/sessions/<pid>.json` every few seconds, mirrors each open chat as a
 card (transcript loaded, new messages arriving as the chat continues, with the client and
-busy/idle status on the card), moves the card to Closed sessions when that process exits, and
+busy/idle status on the card), moves the card under Closed when that process exits, and
 brings it back if the same chat is opened again. Deleting such a card keeps it out until the
 server restarts. Set `AUTO_MIRROR=0` to turn this off.
 
@@ -100,11 +103,12 @@ own saved transcript.
 `Running` → `Done`, `Error`, or `Stopped` (you pressed Stop). `Needs input` is a Claude Code
 permission prompt or `AskUserQuestion`; answer it on the banner (Stop is there too), or in the
 chat's full view. Stop and Resume are run
-controls. Closing a card only moves it to _Closed sessions_ and never stops the run; undo
+controls. Closing a card only moves it under _Closed_ and never stops the run; undo
 from the notice or reopen from the panel.
 
-Each tool step shows as a small block under the reply that ran it: the tool, what it was asked,
-and what came back. Steps are folded to one row; a failed step and the latest one are open. A step that edits a file shows the
+The steps an agent takes between two messages show as one line: how many, which tools, and
+whether any failed. Unfolded (always, in the full view) each step is a row with the tool, what it
+was asked and what came back; a failed step and the latest one are open. A step that edits a file shows the
 lines it takes out and puts in. Messages carry their time; for a mirrored chat that is the time
 Claude Code saved with the message.
 
@@ -128,9 +132,12 @@ means agents run every command, edit and connected tool (anything your MCP serve
 without asking; `Auto` asks far less than the default while still stopping on risky calls. The
 setting covers runs the workspace starts. A chat that is running in VS Code still asks in VS Code.
 
-Sending a prompt scrolls the card to the latest message and keeps following the reply. A card
-you left at the latest message reopens there; one you had scrolled back in reopens where you
-were reading.
+A card stays at the latest message as new ones arrive, for as long as you leave it there. Scroll
+back with the wheel, the trackpad, the keyboard or the scrollbar and it holds still, with a
+**New messages** button to return. Only your own scrolling stops the following: new content, a
+step folding shut or the card changing size never does. Sending a prompt returns to the latest
+message. A card you left at the latest message reopens there; one you had scrolled back in
+reopens where you were reading.
 
 ## Where state lives
 

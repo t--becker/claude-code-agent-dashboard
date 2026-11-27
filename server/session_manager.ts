@@ -69,6 +69,10 @@ export interface ManagerDeps {
 	defaultPermissionMode?: PermissionMode;
 	/** Called when that choice changes, so it survives a restart. */
 	saveDefaultPermissionMode?: (mode: PermissionMode) => void;
+	/** Claude Code model chosen for the whole workspace, if one was. */
+	defaultModel?: string;
+	/** Called when that choice changes. */
+	saveDefaultModel?: (model: string) => void;
 	log?: (message: string) => void;
 }
 
@@ -110,9 +114,11 @@ export class SessionManager {
 	private readonly collectors = new Map<string, OutputCollector>();
 
 	private defaultMode: PermissionMode;
+	private workspaceModel: string | undefined;
 
 	constructor(private readonly deps: ManagerDeps) {
 		this.defaultMode = deps.defaultPermissionMode ?? 'default';
+		this.workspaceModel = deps.defaultModel;
 	}
 
 	get defaultPermissionMode(): PermissionMode {
@@ -128,6 +134,28 @@ export class SessionManager {
 		this.defaultMode = mode;
 		this.deps.saveDefaultPermissionMode?.(mode);
 		for (const session of this.sessions.values()) this.setPermissionMode(session.id, mode);
+		return this.list();
+	}
+
+	/** The Claude Code model chosen for every card, when one has been chosen. */
+	get defaultModel(): string | undefined {
+		const info = this.deps.providerInfos().find((p) => p.id === 'claude-code');
+		// A model that is no longer offered (renamed, retired) is as good as no choice.
+		return info?.models.some((m) => m.id === this.workspaceModel) ? this.workspaceModel : undefined;
+	}
+
+	/**
+	 * Moves every Claude Code card to one model, from its next prompt, and starts new and mirrored
+	 * cards on it. The way out when a model's usage limit is reached across the board.
+	 */
+	setModelForAll(model: string): Session[] {
+		const info = this.deps.providerInfos().find((p) => p.id === 'claude-code');
+		if (!info) throw new HttpError(400, 'Claude Code is unavailable');
+		const resolved = this.resolveModel(info, model);
+		this.workspaceModel = resolved;
+		this.deps.saveDefaultModel?.(resolved);
+		for (const session of this.sessions.values())
+			if (session.provider === 'claude-code') this.setNextModel(session.id, resolved);
 		return this.list();
 	}
 
@@ -172,6 +200,9 @@ export class SessionManager {
 			provider.models.find((m) => m.id === converted.lastModel)?.id ??
 			provider.models.find((m) => m.resolves === converted.lastModel)?.id ??
 			provider.defaultModel;
+		// The card shows the model the chat was using; the workspace's choice takes over from the
+		// first prompt sent here.
+		const chosen = this.defaultModel;
 
 		const now = Date.now();
 		const session: Session = {
@@ -184,6 +215,7 @@ export class SessionManager {
 			providerLabel: provider.label,
 			providerMode: provider.mode,
 			model,
+			...(chosen && chosen !== model ? { nextModel: chosen } : {}),
 			permissionMode: this.defaultMode,
 			state: 'Done',
 			closed: false,
@@ -243,6 +275,7 @@ export class SessionManager {
 			const stillOpen = open.some((o) => o.sessionId === link.sessionId);
 			if (!stillOpen && !session.closed) {
 				session.closed = true;
+				session.closedBy = 'chat';
 				session.transcript.push(
 					entry({
 						kind: 'system',
@@ -250,8 +283,11 @@ export class SessionManager {
 					})
 				);
 				this.commit(session);
-			} else if (stillOpen && session.closed) {
+			} else if (stillOpen && session.closed && session.closedBy !== 'you') {
+				// Only a card that closed with its chat comes back with it. One you closed yourself
+				// stays in Closed, even though its chat is still open elsewhere.
 				session.closed = false;
+				session.closedBy = undefined;
 				session.transcript.push(
 					entry({ kind: 'system', text: 'The Claude Code chat is open again.' })
 				);
@@ -373,7 +409,10 @@ export class SessionManager {
 		const info = infos.find((p) => p.id === wanted) ?? (input.provider ? undefined : infos[0]);
 		const provider = info && this.deps.providers.get(info.id);
 		if (!provider || !info) throw new HttpError(400, `Unknown agent tool: ${wanted}`);
-		const model = this.resolveModel(info, input.model);
+		const model = this.resolveModel(
+			info,
+			input.model ?? (info.id === 'claude-code' ? this.defaultModel : undefined)
+		);
 
 		const permissionMode = input.permissionMode ?? this.defaultMode;
 		assertPermissionMode(permissionMode);
@@ -541,6 +580,7 @@ export class SessionManager {
 	close(id: string): Session {
 		const session = this.get(id);
 		session.closed = true;
+		session.closedBy = 'you';
 		this.commit(session);
 		return clone(session);
 	}
@@ -548,6 +588,7 @@ export class SessionManager {
 	reopen(id: string): Session {
 		const session = this.get(id);
 		session.closed = false;
+		session.closedBy = undefined;
 		this.commit(session);
 		return clone(session);
 	}

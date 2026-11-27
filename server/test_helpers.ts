@@ -97,6 +97,8 @@ export async function makeManager(
 		turnMs?: number;
 		external?: ExternalSource;
 		autoMirror?: boolean;
+		defaultModel?: string;
+		saveDefaultModel?: (model: string) => void;
 	} = {}
 ) {
 	const provider = options.provider ?? makeDemoProvider(options.turnMs);
@@ -112,6 +114,8 @@ export async function makeManager(
 		external: options.external,
 		autoMirror: options.autoMirror,
 		attachmentsDir: path.join(os.tmpdir(), 'aw-test-attachments'),
+		defaultModel: options.defaultModel,
+		saveDefaultModel: options.saveDefaultModel,
 	});
 	manager.init();
 	return { manager, store, bus, info, tmpDir: os.tmpdir() };

@@ -103,6 +103,22 @@ describe('your own topic logos', () => {
 	});
 });
 
+describe('model for all agents route', () => {
+	it('sets every card and answers with the whole workspace, refusing a blank or unknown model', async () => {
+		const deps = await makeDeps(os.tmpdir());
+		const app = createApp(deps);
+		const headers = { 'content-type': 'application/json' };
+		const send = (model: unknown) =>
+			app.request('/api/models', { method: 'POST', headers, body: JSON.stringify({ model }) });
+		const res = await send('claude-opus-5-5');
+		expect(res.status).toBe(200);
+		const body = (await res.json()) as { config: { defaultModel?: string } };
+		expect(body.config.defaultModel).toBe('claude-opus-5-5');
+		expect((await send('')).status).toBe(400);
+		expect((await send('no-such-model')).status).toBe(400);
+	});
+});
+
 describe('artifact library route', () => {
 	it('answers with the library, and with nothing when the server has none', async () => {
 		const deps = await makeDeps(os.tmpdir(), []);

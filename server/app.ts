@@ -180,6 +180,7 @@ export async function workspaceConfig(deps: AppDeps): Promise<WorkspaceConfig> {
 		anyLive: deps.providerInfos().some((p) => p.mode === 'live'),
 		folderPicker: deps.config.folderPicker,
 		defaultPermissionMode: deps.manager.defaultPermissionMode,
+		...(deps.manager.defaultModel ? { defaultModel: deps.manager.defaultModel } : {}),
 	};
 }
 
@@ -244,6 +245,14 @@ export function createApp(deps: AppDeps): Hono {
 	});
 
 	// One switch for every card, and for the cards that appear later.
+	// One model for every card, from each one's next prompt, and for cards that appear later.
+	app.post('/api/models', async (c) => {
+		const { model } = (await c.req.json()) as { model: string };
+		if (typeof model !== 'string' || !model.trim()) throw new HttpError(400, 'Choose a model');
+		manager.setModelForAll(model);
+		return c.json(await bootstrap());
+	});
+
 	app.post('/api/permissions', async (c) => {
 		const { mode } = (await c.req.json()) as { mode: PermissionMode };
 		manager.setPermissionModeForAll(mode);

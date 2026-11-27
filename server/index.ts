@@ -58,7 +58,10 @@ async function main() {
 		autoMirror: config.autoMirror,
 		attachmentsDir: attachmentsDir(config),
 		defaultPermissionMode: settings.load().defaultPermissionMode,
-		saveDefaultPermissionMode: (mode) => settings.save({ defaultPermissionMode: mode }),
+		saveDefaultPermissionMode: (mode) =>
+			settings.save({ ...settings.load(), defaultPermissionMode: mode }),
+		defaultModel: settings.load().defaultModel,
+		saveDefaultModel: (model) => settings.save({ ...settings.load(), defaultModel: model }),
 		log,
 	});
 	manager.init();

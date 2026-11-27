@@ -5,14 +5,7 @@ import { AgentCard } from './components/AgentCard';
 import { ArtifactLibrary } from './components/ArtifactLibrary';
 import { ClosedSessions } from './components/ClosedSessions';
 import { FolderPrompt } from './components/FolderPrompt';
-import {
-	BackIcon,
-	ChevronIcon,
-	LibraryIcon,
-	LogoMark,
-	PlusIcon,
-	YourPicture,
-} from './components/icons';
+import { BackIcon, LibraryIcon, LogoMark, PlusIcon, YourPicture } from './components/icons';
 import { TopicLogos } from './components/TopicIcon';
 import { Notice } from './components/Notice';
 import { ReplyBanner } from './components/ReplyBanner';
@@ -21,7 +14,7 @@ import { useNow } from './hooks/useNow';
 import { useWorkspace } from './hooks/useWorkspace';
 import { countByFilter, filterOf, type Filter } from './lib/groups';
 import { moveCard, orderSessions } from './lib/order';
-import { sessionTones } from './lib/sessionTone';
+import { assignTones } from './lib/sessionTone';
 import { forgetSession, loadUiState, saveUiState, type UiState } from './lib/uiState';
 
 const NO_LOGOS: Record<string, string> = {};
@@ -60,7 +53,6 @@ export function App() {
 		() => Object.values(state.sessions).sort((a, b) => b.createdAt - a.createdAt),
 		[state.sessions]
 	);
-	const tones = useMemo(() => sessionTones(sessions), [sessions]);
 	const open = useMemo(
 		() =>
 			orderSessions(
@@ -71,12 +63,17 @@ export function App() {
 		[sessions, ui.order, ui.pinned]
 	);
 	const closed = useMemo(() => sessions.filter((s) => s.closed), [sessions]);
+	// Each card keeps the colour it was given; cards new to this browser are fitted around them.
+	const tones = useMemo(() => assignTones(open, sessions, ui.tones), [open, sessions, ui.tones]);
+	// Remember the colours just given, during this render, so the next one fits around them.
+	const added = [...tones].filter(([id, tone]) => ui.tones[id] !== tone);
+	if (added.length) patchUi({ tones: { ...ui.tones, ...Object.fromEntries(added) } });
 	const focusedId = ui.focusedId && open.some((s) => s.id === ui.focusedId) ? ui.focusedId : null;
 
 	// Which cards the page shows. An agent that is waiting on you is a banner above the cards;
 	// every other open agent is a card, running or finished, in the order you arranged them.
 	const [filter, setFilter] = useState<Filter>('all');
-	const counts = useMemo(() => countByFilter(open), [open]);
+	const counts = useMemo(() => countByFilter(sessions), [sessions]);
 	const asBanner = (s: Session) =>
 		s.state === 'Needs input' && Boolean(s.pendingInput) && focusedId !== s.id;
 	const banners =
@@ -84,6 +81,7 @@ export function App() {
 	const cards = open.filter((s) => !asBanner(s));
 	const shown = (s: Session) =>
 		focusedId ? s.id === focusedId : filter === 'all' || filterOf(s) === filter;
+	const showingClosed = filter === 'closed' && !focusedId;
 	const togglePin = (id: string) =>
 		patchUi({
 			pinned: ui.pinned.includes(id) ? ui.pinned.filter((p) => p !== id) : [...ui.pinned, id],
@@ -104,6 +102,18 @@ export function App() {
 	}, [notice]);
 
 	// One switch for every card.
+	// One model for every card: the way out when a model's usage limit is reached everywhere.
+	const claude = state.providers.find((p) => p.id === 'claude-code');
+	const setAllModels = async (model: string) => {
+		try {
+			await actions.setAllModels(model);
+			const label = claude?.models.find((m) => m.id === model)?.label ?? model;
+			setNotice({ message: `Every agent now uses ${label} from its next prompt.` });
+		} catch (err) {
+			setNotice({ message: err instanceof Error ? err.message : String(err) });
+		}
+	};
+
 	const setAllPermissions = async (mode: PermissionMode) => {
 		try {
 			await actions.setAllPermissions(mode);
@@ -165,7 +175,7 @@ export function App() {
 		const running = session.state === 'Running' || session.state === 'Needs input';
 		setNotice({
 			sessionId: session.id,
-			message: `${session.title} closed. ${running ? 'Still running in Closed sessions.' : 'Session kept in Closed sessions.'}`,
+			message: `${session.title} closed. ${running ? 'Still running, under Closed.' : 'Kept under Closed.'}`,
 			undo: () => void reopenSession(session),
 		});
 	};
@@ -173,6 +183,8 @@ export function App() {
 	const reopenSession = async (session: Session) => {
 		await actions.reopen(session.id);
 		setNotice(null);
+		// Back to the agents, where the card now is.
+		setFilter('all');
 	};
 
 	// A search result opens its chat in the full view; a closed one comes back to the page first.
@@ -208,6 +220,7 @@ export function App() {
 		{ id: 'reply', label: 'Needs reply' },
 		{ id: 'running', label: 'Running' },
 		{ id: 'done', label: 'Done' },
+		{ id: 'closed', label: 'Closed' },
 	];
 	const mode = state.config?.defaultPermissionMode;
 
@@ -317,6 +330,28 @@ export function App() {
 										))}
 								</div>
 								<div className="tools">
+									{state.loaded && claude && claude.models.length > 1 && (
+										<label className="all-permissions">
+											Model
+											<select
+												aria-label="Model for all agents"
+												title="Moves every card to this model from its next prompt, and starts new cards on it."
+												value={state.config?.defaultModel ?? ''}
+												onChange={(event) => void setAllModels(event.target.value)}
+											>
+												{!state.config?.defaultModel && (
+													<option value="" disabled>
+														Each chat’s own
+													</option>
+												)}
+												{claude.models.map((m) => (
+													<option key={m.id} value={m.id}>
+														{m.label}
+													</option>
+												))}
+											</select>
+										</label>
+									)}
 									{state.loaded && mode && (
 										<label className="all-permissions">
 											Permissions
@@ -393,9 +428,18 @@ export function App() {
 								/>
 							))}
 
+							{showingClosed && (
+								<ClosedSessions
+									sessions={closed}
+									tones={tones}
+									onReopen={(s) => void reopenSession(s)}
+									onRemove={(s) => void removeSession(s)}
+								/>
+							)}
+
 							<div className={`grid${focusedId ? ' focused' : ''}`}>{cards.map(card)}</div>
 
-							{state.loaded && open.length === 0 && (
+							{state.loaded && open.length === 0 && !showingClosed && (
 								<div className="empty">
 									No open agents. Press New agent and choose a project folder.
 								</div>
@@ -404,29 +448,10 @@ export function App() {
 								open.length > 0 &&
 								!focusedId &&
 								banners.length === 0 &&
+								!showingClosed &&
 								!cards.some(shown) && <div className="empty">No agents match this filter.</div>}
 							{!state.loaded && !state.loadError && (
 								<div className="empty">Connecting to the workspace server…</div>
-							)}
-
-							{state.loaded && !focusedId && (
-								<button
-									type="button"
-									className="section-toggle"
-									aria-expanded={ui.archiveOpen}
-									onClick={() => patchUi({ archiveOpen: !ui.archiveOpen })}
-								>
-									<ChevronIcon open={ui.archiveOpen} />
-									Closed sessions ({closed.length})
-								</button>
-							)}
-							{ui.archiveOpen && !focusedId && (
-								<ClosedSessions
-									sessions={closed}
-									tones={tones}
-									onReopen={(s) => void reopenSession(s)}
-									onRemove={(s) => void removeSession(s)}
-								/>
 							)}
 						</>
 					)}

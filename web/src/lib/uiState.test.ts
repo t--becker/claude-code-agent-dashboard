@@ -19,11 +19,23 @@ describe('uiState', () => {
 			permissionMode: 'default',
 			drafts: {},
 			scroll: {},
+			scrollRev: 2,
 			order: [],
 			pinned: [],
+			tones: {},
 		});
 		localStorage.setItem('agent-workspace:ui', '{not json');
 		expect(loadUiState().focusedId).toBeNull();
+	});
+
+	it('drops scroll positions saved by an older version, and keeps everything else', () => {
+		localStorage.setItem(
+			'agent-workspace:ui',
+			JSON.stringify({ scroll: { a: 120 }, drafts: { a: 'hello' }, pinned: ['a'] })
+		);
+		expect(loadUiState()).toMatchObject({ scroll: {}, drafts: { a: 'hello' }, pinned: ['a'] });
+		writeScroll('a', 300);
+		expect(loadUiState().scroll).toEqual({ a: 300 });
 	});
 
 	it('merges patches and keeps drafts and scroll positions per session', () => {

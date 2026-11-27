@@ -29,7 +29,7 @@ export default defineConfig({
 		command: [
 			`rm -rf ${dataDir} ${repoRoot} ${claudeDir}`,
 			`mkdir -p ${repoRoot}/alpha ${repoRoot}/beta`,
-			`node e2e/seed.mjs ${repoRoot} ${claudeDir}`,
+			`node e2e/seed.mjs ${repoRoot} ${claudeDir} ${dataDir}`,
 			'npm run build',
 			`PORT=${port} DATA_DIR=${dataDir} REPO_ROOT=${repoRoot} CLAUDE_CONFIG_DIR=${claudeDir} FORCE_DEMO=1 FOLDER_PICKER=off DEMO_TURN_MS=500 npm start`,
 		].join(' && '),

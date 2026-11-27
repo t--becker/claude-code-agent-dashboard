@@ -339,6 +339,49 @@ describe('SessionManager', () => {
 		});
 	});
 
+	describe('one model for every card', () => {
+		it('moves every card to it from the next prompt, starts new cards on it, and is remembered', async () => {
+			const saved: string[] = [];
+			const { manager } = await makeManager({ saveDefaultModel: (model) => saved.push(model) });
+			const card = await manager.create({ path: tmp, model: 'fable' });
+			expect(manager.defaultModel).toBeUndefined();
+
+			manager.setModelForAll('claude-opus-5-5');
+			expect(saved).toEqual(['claude-opus-5-5']);
+			expect(manager.defaultModel).toBe('claude-opus-5-5');
+			// The card keeps its model until its next prompt, which runs on the new one.
+			expect(manager.get(card.id)).toMatchObject({ model: 'fable', nextModel: 'claude-opus-5-5' });
+			await manager.prompt(card.id, 'carry on');
+			expect(manager.get(card.id)).toMatchObject({ model: 'claude-opus-5-5' });
+			expect(manager.get(card.id).nextModel).toBeUndefined();
+			await waitForState(() => manager.get(card.id), 'Done');
+
+			expect((await manager.create({ path: tmp })).model).toBe('claude-opus-5-5');
+			expect(() => manager.setModelForAll('no-such-model')).toThrow(/not available/);
+		});
+
+		it('starts a mirrored chat on the chosen model from its first prompt here', async () => {
+			const external = new FakeExternalSource();
+			external.add({ sessionId: 'm1', title: 'Report', cwd: tmp, lastModified: Date.now() }, [
+				{
+					type: 'assistant',
+					uuid: 'a1',
+					parent_tool_use_id: null,
+					message: {
+						role: 'assistant',
+						model: 'claude-fable-5-1',
+						content: [{ type: 'text', text: 'hi' }],
+					},
+				},
+			]);
+			const { manager } = await makeManager({ external, defaultModel: 'claude-sonnet-5-5' });
+			expect(await manager.importExternal('m1')).toMatchObject({
+				model: 'fable',
+				nextModel: 'claude-sonnet-5-5',
+			});
+		});
+	});
+
 	describe('outputs', () => {
 		it('collects what an agent made during a run and keeps it with the chat', async () => {
 			const { manager } = await makeManager();
@@ -608,6 +651,31 @@ describe('SessionManager', () => {
 			external.openNow = [];
 			await manager.syncMirrors();
 			expect(manager.get(card.id).external?.open).toBeUndefined();
+		});
+
+		it('keeps a mirrored card you closed in Closed, though its chat is still open elsewhere', async () => {
+			const external = new FakeExternalSource();
+			external.add(chat('open-chat', Date.now()), [prompt('p1', 'hi'), reply('r1', 'hello')]);
+			external.openNow = [{ pid: 9, sessionId: 'open-chat', status: 'idle', client: 'VS Code' }];
+			const { manager } = await makeManager({ external, autoMirror: true });
+			await manager.syncMirrors();
+			const card = manager.list().find((s) => s.external?.sessionId === 'open-chat')!;
+			expect(card.closed).toBe(false);
+
+			// You close it: the next looks at what is open must not bring it back.
+			expect(manager.close(card.id)).toMatchObject({ closed: true, closedBy: 'you' });
+			await manager.syncMirrors();
+			await manager.syncMirrors();
+			expect(manager.get(card.id).closed).toBe(true);
+
+			// Reopened by you, it then follows its chat again: closes with it, returns with it.
+			expect(manager.reopen(card.id)).toMatchObject({ closed: false, closedBy: undefined });
+			external.openNow = [];
+			await manager.syncMirrors();
+			expect(manager.get(card.id)).toMatchObject({ closed: true, closedBy: 'chat' });
+			external.openNow = [{ pid: 10, sessionId: 'open-chat', status: 'idle', client: 'VS Code' }];
+			await manager.syncMirrors();
+			expect(manager.get(card.id).closed).toBe(false);
 		});
 
 		it('imports a chat as an idle mirrored card with its transcript, branch and model', async () => {

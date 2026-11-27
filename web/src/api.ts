@@ -50,6 +50,7 @@ export const api = {
 		post<Session>(`/api/sessions/${id}/permissions`, { mode }),
 	setAllPermissions: (mode: PermissionMode) =>
 		post<BootstrapResponse>('/api/permissions', { mode }),
+	setAllModels: (model: string) => post<BootstrapResponse>('/api/models', { model }),
 	answer: (id: string, input: AnswerInput) => post<Session>(`/api/sessions/${id}/answer`, input),
 	remove: (id: string) => request<void>(`/api/sessions/${id}`, { method: 'DELETE' }),
 };

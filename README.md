@@ -18,8 +18,9 @@ _Sample chats, with the running agent in demo mode._
   conversation itself. Chats you already have open in VS Code or a terminal appear on their own.
 - **A banner when an agent needs you.** Its question, the replies it suggests and a box for your
   own, above everything else.
-- **Readable progress.** Messages read as a chat. Each tool step is one row that opens onto what
-  came back; file edits show the lines removed and added; failures are marked.
+- **Readable progress.** Messages read as a chat. The steps an agent takes between messages fold
+  into one line ("5 steps · Bash, Read"), opening onto each step, what came back, and the lines
+  an edit removed and added. Failures are marked.
 - **Search across everything** (⌘K): titles, your prompts and the replies, in open and closed
   chats.
 
@@ -35,6 +36,12 @@ _Sample chats, with the running agent in demo mode._
 - **Arrange it your way.** Rename chats, change their icons, drag cards into order, pin the ones
   you live in, close the ones you are done with and reopen them later.
 - **One permissions switch** for every agent, from "ask before edits and commands" to "auto".
+- **One model switch** for every agent, beside Permissions. Each card moves to it from its next
+  prompt and new cards start on it. A single card's model is under **Change model** in its "…"
+  menu.
+- **A way on when a model runs out.** When a reply says the model's usage limit is reached, the
+  card offers another model (Opus first) and a **Switch and send again** button that asks the same
+  question on it.
 
 ## Before you start
 
@@ -76,18 +83,21 @@ they happen, answer permission questions from the banner, and run several of the
 
 - **The page.** Agents waiting for your reply come first, each as a banner with the question, the
   replies on offer and a box for your own. Below is one grid with a card for every open agent,
-  running or finished, in the order you arranged them. **Closed sessions** at the bottom holds
-  the cards you closed yourself, each ready to reopen.
+  running or finished, in the order you arranged them. The **Closed** chip, beside Running and Done,
+  shows the chats you closed, each ready to reopen.
 - **Search.** The box at the top (⌘K, or Ctrl+K) looks through every chat the workspace holds,
   open and closed: titles, project names, your prompts, the replies and the tool steps. Every
   word you type must appear in the title or in one message. Chats matched by title come first,
   then the most recently active. Enter or a click opens the chat in the full view; a closed
   chat is reopened first. It searches what the workspace keeps of each chat, which for a very long one is its most recent 1,500 to 2,000 entries.
 - **Chips.** All, Running and Done filter the page and count the open agents; Needs reply joins
-  them when an agent is waiting. Done covers finished, stopped and failed.
+  them when an agent is waiting. Done covers finished, stopped and failed. **Closed** lists the
+  chats you have put away. Closing a card (from its "…" menu) takes it off the page at once and
+  keeps it there, even when it mirrors a chat that is still open in VS Code; it comes back only
+  when you reopen it.
 - **The "…" on a card** holds Open chat, Pin, Rename, Change icon and Close. Double-clicking the
-  title also renames; clicking the icon also changes it; the arrows in the message box also open
-  the full view; the sliders there show the model and permissions for the next prompt.
+  title also renames, and clicking the icon also changes it. Open chat gives the full view, where
+  the model, permissions, project and branch are.
 - **Topic icon.** Each chat has an icon left of its title, in the chat's own colour, for the kind
   of work it holds. It is suggested from the title and the first prompt (`shared/topics.ts`:
   keywords per topic, the title weighted above the prompt), never from the repo, since unrelated
@@ -95,15 +105,15 @@ they happen, answer permission questions from the banner, and run several of the
   prompt. Click the icon to pick another: your pick is saved with the chat and nothing replaces
   it, and the picker offers the suggestion back. Until you pick, a rename can change the
   suggestion; later prompts do not. The same icon shows on the card, in the full view, on the
-  reply banner, in search results and in the Closed sessions list. Topics are line icons from lucide. To use a logo of your own for a topic, put a picture named
+  reply banner, in search results and in the Closed list. Topics are line icons from lucide. To use a logo of your own for a topic, put a picture named
   after the topic id in `~/.agent-workspace/logos`, for example `rcs.png` or `whatsapp.png`
   (`.png`, `.jpg` or `.webp`, up to 1 MB); the ids are listed in `shared/topics.ts`.
-- **Outputs.** When a chat has made something, a bar above its message box says how many things
-  and names them; click it for the list. It is worked out from the agent's tool calls: Confluence
+- **Outputs.** When a chat has made something, a line above its message box names the newest two
+  as links, with the rest behind **+N more**. It is worked out from the agent's tool calls: Confluence
   pages and Jira tickets created or updated, pull requests and issues opened with `gh`, pages
   published with the Artifact tool, Slack messages, Miro boards, files written, and any other
   connected tool that says it creates something and answers with an address. Each opens in a new
-  tab. Edited source files are grouped as **Code changes**, which opens the edits themselves.
+  tab. Edited source files are grouped as **View diff**, which opens the edits themselves.
   Only successful calls count, and a thing touched twice is listed once. Changes an agent makes
   by running a script are not seen, only its own edit and write steps.
 - **Artifacts** (in the header) opens the library of what your agents made. It is read out of

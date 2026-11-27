@@ -183,6 +183,9 @@ export function useWorkspace() {
 		setAllPermissions: useCallback(async (mode: PermissionMode) => {
 			dispatch({ type: 'snapshot', ...(await api.setAllPermissions(mode)) });
 		}, []),
+		setAllModels: useCallback(async (model: string) => {
+			dispatch({ type: 'snapshot', ...(await api.setAllModels(model)) });
+		}, []),
 		answer: useCallback(
 			async (id: string, input: AnswerInput) => apply(await api.answer(id, input)),
 			[apply]

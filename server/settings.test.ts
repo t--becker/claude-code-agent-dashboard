@@ -14,6 +14,14 @@ describe('SettingsStore', () => {
 		expect(fs.statSync(file).mode & 0o777).toBe(0o600);
 		fs.writeFileSync(file, '{"defaultPermissionMode":"anything goes"}');
 		expect(store.load()).toEqual({ defaultPermissionMode: 'default' });
+		// The workspace model is kept beside it, and a damaged value is dropped.
+		store.save({ defaultPermissionMode: 'auto', defaultModel: 'opus' });
+		expect(new SettingsStore(file).load()).toEqual({
+			defaultPermissionMode: 'auto',
+			defaultModel: 'opus',
+		});
+		fs.writeFileSync(file, '{"defaultPermissionMode":"auto","defaultModel":42}');
+		expect(store.load()).toEqual({ defaultPermissionMode: 'auto' });
 		fs.rmSync(dir, { recursive: true, force: true });
 	});
 });

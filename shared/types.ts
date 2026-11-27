@@ -137,6 +137,11 @@ export interface Session {
 	permissionMode: PermissionMode;
 	state: AgentState;
 	closed: boolean;
+	/**
+	 * Who closed it. A card you closed stays closed; one closed because its chat's window went
+	 * away comes back when that chat is opened again.
+	 */
+	closedBy?: 'you' | 'chat';
 	createdAt: number;
 	updatedAt: number;
 	turns: number;
@@ -216,6 +221,8 @@ export interface WorkspaceConfig {
 	folderPicker: boolean;
 	/** Permission mode new and mirrored cards start in; set for every card at once from the header. */
 	defaultPermissionMode: PermissionMode;
+	/** Claude Code model chosen for every card, from each one's next prompt; unset until chosen. */
+	defaultModel?: string;
 }
 
 /** Only the folder is needed. Everything else has a default and can be changed on the card. */

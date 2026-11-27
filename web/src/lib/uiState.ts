@@ -13,11 +13,21 @@ export interface UiState {
 	permissionMode: PermissionMode;
 	drafts: Record<string, string>;
 	scroll: Record<string, number>;
+	/** Which way of remembering scroll positions wrote `scroll`; older ones are dropped. */
+	scrollRev: number;
 	/** Card ids in the order the reader dragged them into. */
 	order: string[];
 	/** Cards pinned to the top of the page. */
 	pinned: string[];
+	/** The colour each card was given, so it keeps it. */
+	tones: Record<string, number>;
 }
+
+/**
+ * Positions saved before 2 came from a card that could mistake new messages for the reader
+ * scrolling back, so they are not trusted: every card reopens at its latest message once.
+ */
+const SCROLL_REV = 2;
 
 const defaults: UiState = {
 	focusedId: null,
@@ -26,12 +36,21 @@ const defaults: UiState = {
 	permissionMode: 'default',
 	drafts: {},
 	scroll: {},
+	scrollRev: SCROLL_REV,
 	order: [],
 	pinned: [],
+	tones: {},
 };
 
 // Always a fresh copy: callers mutate `drafts` and `scroll`, and a shared default object would leak between sessions.
-const fresh = (): UiState => ({ ...defaults, drafts: {}, scroll: {}, order: [], pinned: [] });
+const fresh = (): UiState => ({
+	...defaults,
+	drafts: {},
+	scroll: {},
+	order: [],
+	pinned: [],
+	tones: {},
+});
 
 export function loadUiState(): UiState {
 	try {
@@ -42,9 +61,14 @@ export function loadUiState(): UiState {
 			...fresh(),
 			...parsed,
 			drafts: { ...(parsed.drafts ?? {}) },
-			scroll: { ...(parsed.scroll ?? {}) },
+			scroll: parsed.scrollRev === SCROLL_REV ? { ...(parsed.scroll ?? {}) } : {},
+			scrollRev: SCROLL_REV,
 			order: Array.isArray(parsed.order) ? [...parsed.order] : [],
 			pinned: Array.isArray(parsed.pinned) ? [...parsed.pinned] : [],
+			tones:
+				parsed.tones && typeof parsed.tones === 'object' && !Array.isArray(parsed.tones)
+					? { ...parsed.tones }
+					: {},
 		};
 	} catch {
 		return fresh();
@@ -88,9 +112,11 @@ export function forgetSession(id: string): void {
 	const state = loadUiState();
 	delete state.drafts[id];
 	delete state.scroll[id];
+	delete state.tones[id];
 	saveUiState({
 		drafts: state.drafts,
 		scroll: state.scroll,
+		tones: state.tones,
 		order: state.order.filter((other) => other !== id),
 		pinned: state.pinned.filter((other) => other !== id),
 		focusedId: state.focusedId === id ? null : state.focusedId,
